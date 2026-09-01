@@ -12,6 +12,40 @@ point of the log: entries here are inputs, and the checks are the output.
 
 ---
 
+## 2026-08-31 — A fix recorded in this log had never reached the file it named
+
+**What happened.** An earlier entry today recorded the rule that a trigger test
+is invalid unless the registry is confirmed first, and stated that
+`evals/README.md` "now opens with that check." It did not. The word registry
+appeared nowhere in that file. The manual procedure still told a reader to open a
+fresh session, type the four prompts, and record the result, with nothing
+confirming the skill was in that session at all. Anyone following it would have
+reproduced the exact invalid run the entry was written to prevent.
+
+**Why nothing caught it.** The entry and the procedure are different artifacts,
+and only the entry was written. Recording the rule felt like landing it, and the
+entry's own past tense then stood as evidence that it had landed. Nothing reads
+this log, so "a change landed" is the one class of claim in this repo with no
+check behind it, in a repo whose entire argument is that unchecked claims drift.
+It is the third bucket of its own information model: understood, agreed, and
+captured somewhere other than where the work happens.
+
+**The rule.** An entry may not claim a change landed unless the change is present
+in the file it names, and where that is mechanical the check lands in the same
+sitting. `scripts/check.sh` now asserts that `evals/README.md` carries the
+registry precondition, so this particular claim cannot quietly become false
+again. The general form is already in this file's own header: entries here are
+inputs, and the checks are the output. An entry with neither a check nor a
+verified file reference is a note, not a landing.
+
+**A note on how it surfaced.** It was found by checking the log against the file
+it cited, which nobody had done, because the log is the artifact everyone trusts
+by construction. Both of today's late entries came from running or grepping
+rather than reading. Reading this repo finds classes. Only running it finds
+instances.
+
+---
+
 ## 2026-08-31 — A documented step vanished during a refactor and nothing noticed
 
 **What happened.** The skill opened with "capture the failure before you touch

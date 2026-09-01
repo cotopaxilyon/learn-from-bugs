@@ -76,6 +76,16 @@ if grep -qiE 'five real issues' README.md; then
   fail "README claims five real examples; examples.md labels one illustrative"
 else pass "example provenance is stated honestly"; fi
 
+echo "== the eval procedure gates on the registry =="
+# A trigger run without a confirmed registry measures nothing, and its negative
+# case reads as a pass. The rule was recorded in docs/LESSONS.md and never
+# reached this file; that is the incident this check exists to close.
+if grep -qi 'registry' evals/README.md; then
+  pass "evals/README.md carries the registry precondition"
+else
+  fail "evals/README.md lost the registry precondition, so its procedure describes a run that measures nothing"
+fi
+
 echo "== length budgets =="
 n="$(grep -c "" "$SKILL")"
 if [ "$n" -le "$SKILL_BUDGET" ]; then pass "SKILL.md $n/$SKILL_BUDGET lines"

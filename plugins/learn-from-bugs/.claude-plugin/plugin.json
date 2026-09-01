@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "learn-from-bugs",
+  "version": "1.0.0",
+  "description": "Turn a bug, UX problem, UI regression, or QA finding into a process fix rather than only a code fix.",
+  "author": {
+    "name": "cotopaxilyon"
+  },
+  "keywords": [
+    "qa",
+    "bugs",
+    "postmortem",
+    "root-cause",
+    "code-review",
+    "process",
+    "testing",
+    "ux"
+  ]
+}

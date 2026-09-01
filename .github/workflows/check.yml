@@ -1,0 +1,12 @@
+# Inert until this repo is published — there is no CI on an unpublished repo.
+# Structure checks only. The PHI screen is deliberately absent: it needs a word
+# list that must never be committed (see scripts/phi-screen.sh).
+name: check
+on: [push, pull_request]
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mechanical checks
+        run: ./scripts/check.sh

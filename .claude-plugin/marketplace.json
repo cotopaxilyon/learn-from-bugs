@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cotopaxilyon",
+  "description": "Read bugs, UX problems, and QA findings as evidence about how the work gets done, then change that rather than only the code.",
+  "owner": {
+    "name": "cotopaxilyon"
+  },
+  "plugins": [
+    {
+      "name": "learn-from-bugs",
+      "displayName": "Learn From Bugs",
+      "description": "Every issue carries two findings: the thing that is wrong, and the reason the process let it get this far. Works a bug, UX problem, or QA finding through triage, fix, gate-and-assumption analysis, a sweep for siblings in the code and for the same theme in the issue history, then a change sized to the evidence. It works on day one with no issue history, since your code, your git log, and your Claude Code project's own configuration are all evidence. Built for workflows where Claude runs the tests too, where a green suite written by the same agent that wrote the code shows consistency rather than correctness.",
+      "author": {
+        "name": "cotopaxilyon"
+      },
+      "category": "development",
+      "source": "./plugins/learn-from-bugs"
+    }
+  ]
+}

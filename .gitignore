@@ -1,0 +1,6 @@
+# Local-only PHI word list for scripts/phi-screen.sh — never commit this.
+# Committing it would publish the vocabulary the screen exists to suppress.
+.phi-words
+
+# Eval output is a local signal, not an artifact.
+evals/results/

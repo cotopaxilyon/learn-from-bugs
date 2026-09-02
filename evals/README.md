@@ -13,8 +13,27 @@ its available skills and confirm `learn-from-bugs` is among them before typing a
 single case. When an absent capability and a correct refusal produce identical
 output, the test measures nothing.
 
-**Status: blocked.** `claude plugin eval` is in early access and is not enabled on
-this account (`claude plugin eval init` exits 1 with "currently in early access").
+**Status: blocked, with a local substitute.** `claude plugin eval` is in early
+access and is not enabled on this account (`claude plugin eval init` exits 1 with
+"currently in early access"). Until it is, a candidate can still be tested before
+it is published, which matters because a description change cannot be measured any
+other way: sessions load the installed cache, not the working tree. Copy
+`plugins/learn-from-bugs/skills/learn-from-bugs` into `.claude/skills/` in this
+repo, so a session started here loads the candidate alongside the installed
+plugin. Then drive cases with `claude -p`, and `claude --resume <id> -p` for the
+multi-turn ones. Read the verdict out of the transcript rather than the prose: a
+`tool_use` named `Skill` whose input is the bare `learn-from-bugs` is the
+candidate firing, while `learn-from-bugs:learn-from-bugs` is the installed copy.
+Delete the candidate afterwards, and `scripts/release.sh pre` fails on it if you
+forget.
+
+**Run a baseline arm, and let it finish.** A case that fires with the candidate
+loaded proves nothing until the same case has been run with only the installed
+plugin, because the skill may have been firing already. And read the transcript
+for a completed final message before recording either arm: a run cut off part way
+through looks exactly like a run where the skill declined to fire, and the late
+invocation is the one this suite most needs to see.
+
 The cases are specified here in plain terms rather than as `case.yaml` files,
 because authoring against a guessed schema would produce files that fail the day
 the runner becomes available, and a broken eval reads as a passing one until
@@ -33,6 +52,9 @@ baseline.
 | `agent-found` | "The tests you wrote pass but it's broken in the browser." | The skill fires and reads `references/agent-and-context.md`. It does **not** treat this as a missing test case. A green suite from the same reader is consistency, not correctness. |
 | `backlog` | "What are the last three months of QA findings telling us?" | The skill fires in aggregate mode and reaches for `references/history-sources.md` rather than assuming a tracker it cannot read. |
 | `negative` | "Add a dark mode toggle to the settings page." | The skill does **not** fire. A skill that triggers on ordinary feature work is worse than one that never triggers. |
+| `relayed` | "qa check and respond to this message from the qa agent: <a message carrying two open findings, one raised three sessions ago, framed as 'wants your call at some point'>" | The skill fires even though the deliverable is a reply. A second-hand finding arrives looking like a message to answer, and a deferral reads as an FYI. A finding raised more than once is a theme with the count already attached. |
+| `land-the-approved-fix` | Two turns. Turn one asks for a numbered review of a file and gets back real defects. Turn two says only "ok land 3 now 2 next and reject 1". | The skill fires on **turn two**. On its face that message is indistinguishable from `negative`, and the signal is not in the message at all. It is the two turns of defect discussion behind it. |
+| `negative-with-context` | The same turn one as above, then "Add a dark mode toggle to the settings page." | The skill does **not** fire. This is the guard on the trigger clause the two cases above required: prior defect discussion must not be enough on its own, or the clause has bought the over-firing failure `negative` exists to prevent. |
 
 The negative case is the one worth guarding hardest. Over-triggering is the
 failure mode that gets a skill uninstalled, and it is invisible to every other

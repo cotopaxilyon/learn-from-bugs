@@ -1,7 +1,7 @@
 # Worked examples
 
 Companion to `SKILL.md`. Five issues run end to end, so the shape of the output is
-visible rather than described, this is also the format steps 6 and 7 ask for.
+visible rather than described, this is also the format steps 6 and 8 ask for.
 
 Examples 1 to 4 are real. Three come from a production web app we build and
 maintain ourselves, and the fourth from this skill's own development. They are our

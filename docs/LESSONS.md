@@ -12,6 +12,97 @@ point of the log: entries here are inputs, and the checks are the output.
 
 ---
 
+## 2026-09-01 — The critic proposed for step 7 was the self-audit this skill rejects
+
+**What happened.** The session write-up that produced today's other two entries
+also proposed a critic pass, and argued for it well: a general "review this
+analysis" read shares the author's frame and blesses it, so the questions have to
+be answerable without re-deriving the analysis. It landed as five questions at the
+end of the author's own turn, which is the same reader auditing their own work,
+and that is the exact argument the skill makes about a suite written by the author
+of the code. Three of the five also re-ask rules
+that steps 3, 4 and 5 now carry upstream, so a self-answered version adds
+ceremony without adding a reader.
+
+**Why nothing caught it.** The proposal made the same-reader argument about tests
+and exempted itself from it, and nothing in the skill asked where a new step runs.
+Every existing structural check reads what a step says, not who executes it, so a
+step that names no executor passes every one of them.
+
+**The rule.** A critic pass runs in a context that does not have the author's, so
+a subagent, a separate session, or a person who was not in the work, and its brief
+is the artifacts rather than the reasoning. Where no fresh reader is available,
+record that the pass did not run, since a step answered by the author reads as
+done. `scripts/check.sh` asserts that step 7 still names where it runs, and the
+assertion was watched failing against a step 7 with that wording removed.
+
+---
+
+## 2026-09-01 — Three gates failed while green, and the skill never asked whether they could fail
+
+**What happened.** One session ran eleven tickets through this skill in a day.
+Three of the day's defects were guarded by checks that were
+written deliberately, ran in CI, and were green for the entire life of the defect
+they existed to catch. A grep asking "does any file re-derive a day inline" could
+not see two accessors inside the exempt file disagreeing with each other. A grep
+asking "does fetch appear before the cache read" could not see that
+`fetch(req).catch(...)` has that exact shape and still serves a 401. A unit suite
+grew by twenty-two tests in the same commit as a fix, and one of them asserted the
+reported symptom as expected behavior. A fourth sat beside them: the suite had
+only ever executed in the author's timezone and CI's, one of which is UTC, the one
+timezone in which a UTC-versus-local defect cannot exist. Run elsewhere it failed
+in five zones of ten, and one of those failures was a live defect misfiling data
+for every user east of London.
+
+**Why nothing caught it.** Step 5 ranked a runnable check above everything else
+and warned that a guideline where a check was possible is folklore. Both are about
+whether a check exists. Nothing in the skill asked whether the check that exists
+can fail, so a check that answered a cheaper question than its rule asked read
+as the
+strongest fix available. Step 1's failing test is a different
+artifact from the gate kept afterwards, and the skill never separated them.
+
+**The rule.** A check is not landed until it has been run against the defect it
+exists to catch and observed red; until then it is a hypothesis about a check.
+Then describe a violation that would still pass it, because that sentence
+specifies the next bug. Step 5 carries the rule,
+`references/checks-that-cannot-fail.md`
+carries the shapes, and step 5's history table now names "enforced by a check that
+answers a cheaper question than the rule asks" as the first thing to test when a
+rule already exists and is not working. `scripts/check.sh` cannot assert this for
+other people's checks, so it asserts what it can here: this repo's own new count
+check was written, watched failing against a deleted question, and only then kept.
+
+---
+
+## 2026-09-01 — A scoped grep became an absolute claim, then an acceptance criterion, then nearly a deletion
+
+**What happened.** During a sideways sweep in the same session, a note recorded
+that a module was "imported only by X" and that "nothing uses it." Neither had
+been checked. What had actually run was a grep scoped to two paths, reported as an
+absolute. The claim became a code comment, then an acceptance criterion offering
+deletion, then the deletion. A failing import resolution stopped it, not a gate.
+
+**Why nothing caught it.** Step 4 asked for the search to be named, but framed it
+as a reporting convention ("'I did not find others' carries weight only when it
+names the search"), which reads as a courtesy to the reader rather than as the
+thing that keeps the claim true. And a scoped search reported as an absolute is
+invisible in its own output, since a grep that excluded the answer looks exactly
+like one that did not. The skill also had no line about what happens downstream: a
+sweep finding that becomes a ticket loses its provenance and keeps its confidence,
+gaining authority at each hop and being re-derived at none.
+
+**The rule.** Report the search, not the conclusion, as a correctness rule in step
+4 rather than a reporting one. Where the question is mechanically decidable,
+compute it (the compiler, the import graph, a test run) instead of searching for
+it. Anything that will authorize a deletion, a migration or an overwrite travels
+with the command that produced it and not with the sentence it produced. The
+critic pass added at step 7 asks it twice over, once as "which factual claim here
+was not measured" and once as "is anything here destructive, and does its premise
+hold."
+
+---
+
 ## 2026-08-31 — A fix recorded in this log had never reached the file it named
 
 **What happened.** An earlier entry today recorded the rule that a trigger test

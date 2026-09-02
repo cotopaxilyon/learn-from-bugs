@@ -1,9 +1,10 @@
 # Do not
 
-Companion to `SKILL.md`. Read this before closing the issue. It is the compressed
-form of every step above, and of the failure modes each one exists to prevent.
+Companion to `SKILL.md`. Read this before closing the issue. It is the
+compressed form of every step above, and of the failure modes each one exists to
+prevent.
 
-- Close an issue with only the fix. A green test is step 2 of 7.
+- Close an issue with only the fix. A green test is step 2 of 8.
 - Accept "forgot," "human error," or "one-off" as the cause. A one-off is a claim
   about a class, and step 4 is how that claim gets earned.
 - Let the analysis land on a person, including as "they should have read it more
@@ -31,6 +32,20 @@ form of every step above, and of the failure modes each one exists to prevent.
 - Treat "it was in the ticket" as closing the question. Availability is not
   delivery, and when the requirement lived where nobody looks, the location is the
   bug.
+- Answer step 7's five questions yourself, or park them on a session you will open
+  later. A reader holding the author's context is not a critic, and a pass owed to
+  a later reader is one this run did not have. Dispatch it, or record it as not
+  run.
+- Keep a check you have never watched fail. Until it has gone red against the
+  defect it exists to catch, it is a hypothesis about a check, and a gate that
+  cannot fail turns every green run into an argument against looking.
+- Report a scoped search as an absolute. "Nothing else uses this" from a grep over
+  two paths is invisible in its own output, and the claim gains authority at every
+  hop while being re-derived at none. Anything that will authorize a deletion or a
+  migration travels with the command that produced it.
+- Adopt an unexercised module, fixture, runbook or config template as though it
+  were a no-op. Nothing has been holding it correct since the last time anyone
+  ran it. Diff it against what ships.
 - Build a process change on one instance because the bug felt bad, since ceremony
   earned by a single data point has nothing to point at later. And do not treat a
   recurring theme as unrelated small bugs because each was individually cheap,

@@ -1,6 +1,6 @@
 ---
 name: learn-from-bugs
-description: Turn a bug, UX problem, UI regression, or QA finding into a process fix, not just a code fix — and read it against earlier issues, because a recurring theme is a planning failure, not a bug. Applies whether the tester was a human, a QA team, or Claude itself running the tests. Use on "QA failed this", "a user reported", "found a bug while testing", "the tests passed but it's broken", "you missed this", "this looks wrong", "this regressed", "reopened", "cannot reproduce". **Also use it when the code is correct and the requirement or design was wrong** — "it works as built but it shouldn't be there", "this shipped to the wrong users", "working as specified and still wrong", "not a bug, but it's wrong" — that case is the one this skill is most useful for, because it usually had no gate at all. And use it in aggregate to read a backlog for themes: "what are our bugs telling us", "why do we keep shipping accessibility issues", "what do our closed issues say about how we work", "look at the last few months of issues and tell me what they say about us".
+description: Turn a bug, UX problem, UI regression, or QA finding into a process fix, not just a code fix — and read it against earlier issues, because a recurring theme is a planning failure, not a bug. Applies whether the tester was a human, a QA team, or Claude itself running the tests. Use on "QA failed this", "a user reported", "found a bug while testing", "the tests passed but it's broken", "you missed this", "this looks wrong", "this regressed", "reopened", "cannot reproduce". **Also use it when the code is correct and the requirement or design was wrong** — "it works as built but it shouldn't be there", "this shipped to the wrong users", "working as specified and still wrong", "not a bug, but it's wrong" — that case is the one this skill is most useful for, because it usually had no gate at all. **Also use it on two shapes that carry no defect words at all.** Use it when a message only tells you to implement a fix this session already agreed on — "ok do option 3", "land that one", "go with 2, reject 1" — because the trigger is the fix rather than how the request is phrased, so the prior turns matter more than the sentence in front of you. And use it on findings relayed from somebody else — a QA agent's message, a forwarded report, a teammate's note — including when they arrive as an FYI or deferred as "wants your call at some point", because a finding raised more than once and deferred each time is already a theme. And use it in aggregate to read a backlog for themes: "what are our bugs telling us", "why do we keep shipping accessibility issues", "what do our closed issues say about how we work", "look at the last few months of issues and tell me what they say about us".
 user-invocable: true
 ---
 # learn-from-bugs
@@ -17,12 +17,10 @@ because somebody already paid to find it.
 One issue rarely carries a diagnosis on its own, though. A single bug tells us
 what broke; it takes several to tell us what a team is systematically bad at.
 Nine accessibility bugs across four features are not nine mistakes. They are one
-finding, which is that accessibility never enters planning, and fixing them one at
-a time will not change that. So this skill does two things at once. It works the
-issue in front of us, and it reads that issue against the ones before it.
-Diagnosing too hard off a single instance bolts on a rule that fits one bug;
-ignoring the accumulation means fixing the same theme forever, one ticket at a
-time.
+finding, which is that accessibility never enters planning. So this skill works
+the issue in front of us and reads it against the ones before it. Diagnosing too
+hard off a single instance bolts on a rule that fits one bug; ignoring the
+accumulation means fixing the same theme forever, one ticket at a time.
 
 Everything QA or testing surfaces is in scope, so logic bugs but equally UX
 problems, UI regressions, confusing copy, and an empty state nobody designed. "It
@@ -47,11 +45,9 @@ and expected, plus device, version, and a screenshot for anything visual, in one
 message. We treat their framing as a hypothesis about where they noticed it
 rather than as a diagnosis. We copy the mechanism and never the payload, since
 reports arrive carrying names, customer data, and tokens a repo may not be
-cleared to hold. "Cannot reproduce" is a finding, not a close.
-
-Full procedure in `references/intake.md`, including the four triage verdicts, why
-all four still owe you step 3, and why "user error" is a finding about the
-interface.
+cleared to hold. "Cannot reproduce" is a finding, not a close. Full procedure in
+`references/intake.md`, including the four triage verdicts, why all four still owe
+you step 3, and why "user error" is a finding about the interface.
 
 ## When the tester, or the author, is an agent
 
@@ -78,7 +74,7 @@ copy, and anything else testing surfaces. The only exemption is a change with no
 behavioral cause to explain, so a typo in a string, a formatting change, a rename.
 
 A five-minute fix is often the best evidence of a theme, so cheap issues are in
-scope too. The weight scales with the evidence: on a first-of-its-kind issue,
+scope too. The weight scales with the evidence, and on a first-of-its-kind issue
 steps 4 to 6 are three lines and a label.
 
 ## 1. Capture, then reproduce
@@ -112,6 +108,7 @@ Name the gate that should have caught it, and the structural reason it did not:
 | The design | Did a design exist for this case, or was it improvised during implementation? Was the built thing ever compared against it, and if the design file changed after the work started, does its version history show that? |
 | The contract or invariant | Was there a rule that got silently bypassed, or was there no rule? |
 | The tests | Did a test cover the write but not the round trip? Was the code structurally untestable? |
+| The environment the suite runs in | Which timezone, locale, viewport, connection and data age has it ever actually executed in? A class of defect cannot be falsified in the one environment where it cannot occur, and the default is often exactly that one. |
 | QA | In scope and missed, or never in scope? Run against the deployed build or a local one? |
 | The agent's own verification | If an agent wrote and ran the tests, did they encode the requirement or the implementation? A green suite from the same reader shows the two agree, which is not the same as either being right. |
 | Detection | Did anything tell you (a log, a thrown error, a failed request, a metric), or did a human have to? How long was it live? |
@@ -230,12 +227,12 @@ requirements.
 
 "We forgot," "human error," and "they should have read it" are not answers, they
 are the absence of one. The last is worse than useless, because it names the
-failure as a character flaw in the one person closest to the work, which
-guarantees the next person hides theirs. Every one of them rewrites into a
-structural sentence: nothing made the important line stand out, nothing made
-forgetting visible, nothing tested whether the two readings matched, nothing
-failed loudly when the wrong thing happened. Keep asking until you have that
-sentence, because blame stops the analysis one step before it becomes useful.
+failure as a character flaw in the person closest to the work, which guarantees
+the next person hides theirs. Every one of them rewrites into a structural
+sentence: nothing made the important line stand out, nothing made forgetting
+visible, nothing tested whether the two readings matched, nothing failed loudly
+when the wrong thing happened. Keep asking until you have that sentence, because
+blame stops the analysis one step before it becomes useful.
 
 ## 4. Name the class, then sweep the code and the history
 
@@ -243,8 +240,8 @@ This is the load-bearing step and the one that gets skipped. What you found is o
 instance of a class. State the class with every specific removed, then go looking
 for the others before concluding there are none, in two directions.
 
-Check whether the class is one of these, or add your own. The four families in
-brief, with the full catalog in `references/classes.md`:
+Check whether the class is one of these, or add your own. The families in brief,
+with the full catalog in `references/classes.md`:
 
 - **Technical.** Silent failures, environment-specific behavior, boundary values,
   writes with no reader, state that outlives a session.
@@ -254,6 +251,8 @@ brief, with the full catalog in `references/classes.md`:
   an ambiguity resolved silently, a constraint lost to compaction.
 - **Process.** Requirements that live in comments, tickets edited mid-flight, a
   term meaning two things, decisions that exist only in a conversation.
+- **Decay.** An artifact nothing exercises, adopted later as though it were a
+  no-op.
 
 Name it with the same words used last time, since an inconsistently labelled class
 is invisible to the sweep below.
@@ -261,10 +260,18 @@ is invisible to the sweep below.
 ### Sweep sideways, through the code, right now
 
 A grep, a pass over sibling call sites, a look at the other screens with the same
-state, a reread of the tickets written the same week. Report the result even when
-it is zero, so how many places you looked and how many you found. "I did not find
-others" carries weight only when it names the search. Fix trivial siblings in the
+state, a reread of the tickets written the same week. Fix trivial siblings in the
 same change and ticket the rest, rather than leaving them silently known.
+
+**Report the search, not the conclusion.** "Nothing else uses this" and "that is
+the only caller" are claims about a population, and a scoped search reported as an
+absolute is invisible in its own output, since a grep that excluded the answer
+looks exactly like one that did not. Name the command and the paths it covered, or
+compute the answer where that is mechanically decidable (the compiler, the import
+graph, a test run) rather than searching for it. A finding loses its provenance
+and keeps its confidence the moment it becomes a ticket, so anything that will
+authorize a deletion, a migration or an overwrite travels with the command that
+produced it and not with the sentence it produced.
 
 ### Sweep backwards, through the issue history
 
@@ -306,9 +313,8 @@ Three sources exist before a single label does: the issue itself, the codebase a
 its git history, and the project's own Claude Code configuration, because when an
 agent wrote the code the instructions it worked from are on disk and are
 themselves evidence. Day one yields the gate, the bucket, the sideways sweep, and
-a first labeled entry. It does not yet yield the theme, so say that.
-
-See `references/history-sources.md` for day-one sources and the retrieval move for
+a first labeled entry. It does not yet yield the theme, so say that. See
+`references/history-sources.md` for day-one sources and the retrieval move for
 every other place a history might live.
 
 ## 5. Land a change that matches the evidence
@@ -324,38 +330,20 @@ thing forever.
 | **First of its kind** | A targeted fix: a test at the boundary, a check, a note in the log. Do not invent a process for one data point. Record the class so the second instance is recognizable. |
 | **Second or third** | Now it is a class. A runnable check, a template question, or a rule where your project keeps rules. |
 | **A theme across features** | Stop patching. The finding is upstream: a missing phase (design, accessibility, threat modeling), an unowned responsibility, a skill gap, or a definition of done that never mentions it. Propose the investment, with the issue count as the argument. |
-| **A theme you already wrote a rule for** | The rule is not working. Ask why it is ignorable (unenforced, unknown, or too expensive to follow) and fix that instead of restating it louder. |
+| **A theme you already wrote a rule for** | The rule is not working. Ask first whether the check behind it answers a cheaper question than the rule asks, and then whether it is unenforced, unknown, or too expensive to follow. Fix that instead of restating it louder. |
 
-For the targeted end of that table, the menu:
+For the targeted end of that table, `references/land-a-change.md` has one
+mechanism per kind of gap, ranked from a CI check down to a readback. When a
+check was
+possible and you wrote a guideline instead, you have shipped folklore. Say why the
+check was not possible, or write the check.
 
-- a runnable check wired into CI, which we prefer to everything below it
-- a test at the boundary the class lives on, or a visual or interaction regression
-  test where a unit test cannot reach
-- a written-down rule where your project keeps rules, when no check is possible
-- a question added to the ticket or plan template, when the gap was an unasked
-  question ("which states does this have?", "what happens when it is empty?").
-  This is the highest-leverage fix for the 3b classes
-- a change to what "done" means, or to who reviews what, when the gap was a
-  handoff or an unowned surface
-- a relocation, so the requirement moved out of a comment and into the
-  description, or the constraint moved out of a chat thread and into the file it
-  governs, when the information existed and did not reach the reader
-- a capture point (a decision log, a required "why not the obvious approach" line
-  in the ticket, a comment at the constraint site, a `CLAUDE.md` entry) when the
-  information was understood at the time and gone when it was needed. Judge it by
-  whether someone who does not know it exists could find it
-- a readback step, where whoever will build it restates the requirement in their
-  own words or writes one acceptance criterion as a concrete scenario with values,
-  and the author confirms, when two people were confidently misaligned
-- a line where the agent will read it (`CLAUDE.md`, a skill, an agent instruction,
-  or a hook that blocks it mechanically) when the gap was a convention that
-  existed only in someone's head
-- a signal (an assertion that throws, a log line, an alert) when the gap was that
-  nothing would have told you. For anything a user reported, ship this as well as
-  the prevention, since prevention and detection fail independently.
-
-When a check was possible and you wrote a guideline instead, you have shipped
-folklore. Say why the check was not possible, or write the check.
+**Then watch the new check fail.** Run it against the defect it exists to catch
+and see it red before you keep it, because a check never observed failing is a
+hypothesis about a check. Then describe a violation that would still pass it. If
+you can write that sentence, that is the next bug, already specified.
+`references/checks-that-cannot-fail.md` has the shapes this takes, including
+generated checks, which owe you a known instance they are required to rediscover.
 
 At the theme end of the table, the changes that actually move a theme are rarely
 code: a step added to the design phase, a specialist review on a category of work,
@@ -388,10 +376,40 @@ applies.
 If your project has no incident log, that is the step-5 finding. Start it with
 this issue.
 
+Watch the log's own volume too. Several entries out of one sitting are a finding
+in themselves, and the run after one of those is a consolidation pass rather than
+another entry, since a theme is worth more than the instances under it.
+
 `references/examples.md` runs five issues end to end in this format, including
 what a first-of-its-kind writes versus what a theme writes.
 
-## 7. Then re-verify
+## 7. A short critic pass, in a fresh context
+
+Before it goes back for verification, dispatch a subagent with a fresh context and
+hand it the artifacts. Not a second read by you, since the same reader who
+produced the analysis shares its frame and will bless it, and not a reader you
+have to go and find later either, because a pass owed to a later session is one
+this run did not have.
+
+Send the artifacts and not the reasoning, so the change, every check it
+introduces, the incident entry, and the commands the sweep actually ran. Narrative
+is what carries the frame across. Five questions, each answerable from those
+artifacts without re-deriving the analysis, which is what keeps the pass cheap and
+hard to rubber-stamp:
+
+1. Which factual claim here was not measured?
+2. Has each check this change introduces been watched failing against its defect?
+3. Is anything here destructive, and does its premise hold?
+4. Is this finding new, or an instance of one already in the log?
+5. What environment would make this class invisible, and is that the only one we
+   run in?
+
+It comes back as a short list or nothing at all. With no fresh reader available,
+record that the pass did not run rather than answering the five yourself, which is
+the version this step exists to rule out. `references/critic-pass.md` says what
+each question is looking for, and what the pass cannot catch.
+
+## 8. Then re-verify
 
 Re-verify wherever the work actually gets exercised, so against the deployed build
 if your project deploys before anyone signs off, and against whatever stands in
@@ -401,9 +419,7 @@ fix, the gate, the assumption, the sweep, and the change.
 ## Before you close it
 
 `references/do-not.md` is the compressed form of everything above, so the ways
-this analysis gets quietly skipped, from closing with only the fix, to accepting
-"human error" as a cause, to letting a same-turn fix vanish without a label. Read
-it before calling the issue done.
+this analysis gets quietly skipped. Read it before calling the issue done.
 
 ## The periodic read, running this without a specific bug
 
@@ -411,9 +427,7 @@ The other way to run this is over a window (the last month of closed issues, a
 release's QA findings, a support queue) on a cadence rather than only when
 something hurts, because no single ticket in the pile would ever trigger it. Tally
 by theme rather than severity and pick one upstream change, with the issue count
-as its argument.
-
-Procedure in `references/backlog-read.md`, retrieval in
+as its argument. Procedure in `references/backlog-read.md`, retrieval in
 `references/history-sources.md`.
 
 ## When nothing could have caught it

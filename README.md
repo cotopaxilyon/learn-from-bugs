@@ -2,7 +2,7 @@
 
 A Claude Code skill for the moment a bug comes back from testing.
 
-It analyzes the process, using the bug as evidence. The fix is step 2 of 7.
+It analyzes the process, using the bug as evidence. The fix is step 2 of 8.
 
 The reflex is to fix a QA finding and move on. That fix is the cheap half. The
 blind spot that produced it is still in place, and the bug you found is only the
@@ -14,7 +14,7 @@ accessibility never enters planning, and fixing them one at a time will not
 change that. So the skill works the issue in front of you and reads it against
 the issues that came before it.
 
-## The seven steps
+## The eight steps
 
 Before them there is intake: getting something reproducible out of a person,
 without pulling their data into your repo along with it. "Cannot reproduce" and
@@ -37,10 +37,19 @@ rather than as ways to close a ticket.
 5. **Land a change sized to the evidence.** A first-of-its-kind gets a test
    rather than a process. A third instance earns a check. A theme across features
    means the fix is not code at all: a missing phase, an unowned responsibility,
-   a line in the definition of done.
+   a line in the definition of done. Whatever the change is, it gets run against
+   the defect it exists to catch and watched failing, because a check nobody has
+   seen go red is a hypothesis about a check.
 6. **Record and tag.** What happened, why nothing caught it, the rule it
    produces. A pattern nobody labeled is one nobody will see.
-7. **Re-verify.** Wherever the work actually gets exercised.
+7. **A short critic pass, in a fresh context.** Five questions, put to a subagent
+   rather than answered by the author, since a reader holding the author's
+   context is not a critic. They are answerable from the artifacts without
+   re-deriving the analysis: which claim went unmeasured, which new check has
+   never been watched failing, what is destructive and resting on an unchecked
+   premise, whether the finding is already in the log, and which environment
+   would hide the class.
+8. **Re-verify.** Wherever the work actually gets exercised.
 
 ## Built for workflows where Claude runs the tests too
 
@@ -132,11 +141,12 @@ only arrives if you labelled the earlier ones.
 
 ## How it is structured
 
-`SKILL.md` holds the seven steps and the information layer. The conditional
+`SKILL.md` holds the eight steps and the information layer. The conditional
 material sits in `references/` and loads only when it applies: `intake.md`,
 `agent-and-context.md`, `classes.md`, `history-sources.md`, `backlog-read.md`,
-`do-not.md`, and `examples.md`, which runs five issues end to end so the output
-shape is visible rather than described.
+`land-a-change.md`, `checks-that-cannot-fail.md`, `critic-pass.md`, `do-not.md`,
+and `examples.md`, which runs five issues end to end so the output shape is
+visible rather than described.
 
 That split is the skill taking its own advice. A rule buried on page four of a
 long file fails the same way a requirement buried in comment #14 does.

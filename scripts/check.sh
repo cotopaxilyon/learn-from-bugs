@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# Mechanical checks for the learn-from-bugs skill (PLAN §6, tier 1).
-# Structure only — the PHI screen is scripts/phi-screen.sh (local, never CI)
-# and triggering is `claude plugin eval` (informative, not blocking).
+# Mechanical checks for the learn-from-bugs skill. Structure only, and safe to run
+# anywhere: the PHI screen is scripts/phi-screen.sh (local, never CI, because it
+# reads an uncommitted word list) and triggering is `claude plugin eval`
+# (informative, not blocking).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 SKILL="plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md"
 REFS="plugins/learn-from-bugs/skills/learn-from-bugs/references"
-SKILL_BUDGET=430
+# Raised 2026-09-01 from 430, for step 7 and the fifth class family. The previous
+# fit was bought partly by compressing baseline prose, and a voice check against
+# the published copy flagged two of those compressions as meaning lost. Ten lines
+# is the cost of the step, not a licence for the next one.
+SKILL_BUDGET=440
 REF_BUDGET=200
-# Per-file override. history-sources.md is the canonical home for retrieval by
-# design (PLAN §3A) — every other file points at it and may not restate it — so it
-# is structurally the largest reference and grows with each source the ecosystem
-# adds. A uniform cap across files with different jobs was the wrong shape; this
+# Per-file override. history-sources.md is the canonical home for retrieval:
+# every other file points at it and may not restate it, which the tracker-name
+# check below enforces. So it is structurally the largest reference and grows with
+# each source the ecosystem adds. A uniform cap across files with different jobs was the wrong shape; this
 # is a stated exception, not a cap raised on contact. Everything else stays at 200.
 REF_BUDGET_history_sources=220
 fails=0
@@ -36,15 +41,15 @@ grep -oE 'references/[a-z-]+\.md' "$SKILL" | sort -u | while read -r ref; do
   [ -f "plugins/learn-from-bugs/skills/learn-from-bugs/$ref" ] || exit 1
 done || fails=$((fails + 1))
 
-echo "== step headings are 1..7, in order, no gaps =="
+echo "== step headings are 1..8, in order, no gaps =="
 steps="$(grep -oE '^## [0-9]+\.' "$SKILL" | grep -oE '[0-9]+' | tr '\n' ' ')"
-if [ "$steps" = "1 2 3 4 5 6 7 " ]; then pass "steps: $steps"
-else fail "expected '1 2 3 4 5 6 7', got '$steps' (a step was lost, added, or reordered)"; fi
+if [ "$steps" = "1 2 3 4 5 6 7 8 " ]; then pass "steps: $steps"
+else fail "expected '1 2 3 4 5 6 7 8', got '$steps' (a step was lost, added, or reordered)"; fi
 
 echo "== README's numbered list matches the step count =="
 readme_steps="$(grep -cE '^[0-9]+\. \*\*' README.md)"
-if [ "$readme_steps" = "7" ]; then pass "README lists 7 steps"
-else fail "README lists $readme_steps steps, SKILL.md has 7 — the two have drifted"; fi
+if [ "$readme_steps" = "8" ]; then pass "README lists 8 steps"
+else fail "README lists $readme_steps steps, SKILL.md has 8 — the two have drifted"; fi
 
 echo "== retrieval guidance lives in exactly one file =="
 for tracker in Linear Jira Shortcut "Azure DevOps" Slack Discord Zendesk Intercom Sentry Pendo Amplitude FullStory; do
@@ -72,6 +77,16 @@ else fail "bucket count drifted: $(echo "$wrong" | head -2)"; fi
 holes="$(grep -rniE '(two|four|five) specific holes' "$SKILL" "$REFS" README.md 2>/dev/null || true)"
 if [ -z "$holes" ]; then pass "the agent section is three holes everywhere"
 else fail "hole count drifted: $(echo "$holes" | head -2)"; fi
+step7="$(sed -n '/^## 7\./,/^## 8\./p' "$SKILL")"
+critic_qs="$(printf '%s' "$step7" | grep -cE '^[0-9]+\. ')"
+if [ "$critic_qs" = "5" ]; then pass "the critic pass is five questions"
+else fail "step 7 lists $critic_qs numbered questions, and its text says five"; fi
+# The pass is only a pass if a different reader runs it. An author answering the
+# five at the end of their own turn is the self-audit the skill rejects about
+# tests, so the step has to say where it runs, not only what it asks.
+if printf '%s' "$step7" | grep -qi 'fresh context' && printf '%s' "$step7" | grep -qi 'subagent'; then
+  pass "step 7 dispatches to a reader without the author's context"
+else fail "step 7 no longer says where it runs, so it reads as a self-audit"; fi
 if grep -qiE 'five real issues' README.md; then
   fail "README claims five real examples; examples.md labels one illustrative"
 else pass "example provenance is stated honestly"; fi
@@ -85,6 +100,56 @@ if grep -qi 'registry' evals/README.md; then
 else
   fail "evals/README.md lost the registry precondition, so its procedure describes a run that measures nothing"
 fi
+
+echo "== the step count is stated consistently everywhere =="
+# Prose that counts the steps is invisible to the ordering check above: a
+# renumber leaves "step 2 of 7" and "the seven steps" behind, reading as correct.
+# examples.md is exempt at one line, where "the seven steps were still seven"
+# recounts an incident that happened when there were seven.
+n_steps="$(grep -cE '^## [0-9]+\.' "$SKILL")"
+words="one two three four five six seven eight nine ten"
+want_word="$(echo "$words" | cut -d' ' -f"$n_steps")"
+bad="$(grep -rnE "step [0-9]+ of [0-9]+" "$SKILL" "$REFS" README.md | grep -vE "of $n_steps\b" || true)"
+if [ -z "$bad" ]; then pass "\"step N of $n_steps\" is current everywhere"
+else fail "stale step total: $(echo "$bad" | head -2)"; fi
+# Scoped to "the N steps", which is how the procedure is referred to. A bare
+# "in seven steps" would still pass, and so would a count written as a numeral.
+wrong_word="$(grep -rniE "the (one|two|three|four|five|six|seven|eight|nine|ten) steps" "$SKILL" "$REFS" README.md \
+  | grep -viE "the $want_word steps" | grep -v 'examples.md:.*still seven' || true)"
+if [ -z "$wrong_word" ]; then pass "spelled-out step count is \"$want_word\" everywhere"
+else fail "stale spelled-out step count: $(echo "$wrong_word" | head -2)"; fi
+
+echo "== references cross-link only to references that exist =="
+# check.sh already walks SKILL.md both ways. References cite each other too, and
+# nothing was reading those.
+xbad=0
+for f in "$REFS"/*.md; do
+  for target in $(grep -oE '`[a-z-]+\.md`' "$f" | tr -d '`' | sort -u); do
+    case "$target" in SKILL.md|CLAUDE.md) continue ;; esac
+    [ -f "$REFS/$target" ] || { fail "$(basename "$f") cites $target, which does not exist"; xbad=1; }
+  done
+done
+[ "$xbad" -eq 0 ] && pass "every reference-to-reference citation resolves"
+
+echo "== nothing cites the removed PLAN document =="
+# The PLAN was deleted; three header comments went on citing it by section for
+# some time afterwards, reading as authority and resolving to nothing. A citation
+# to any other missing document would still slip past this.
+stale_plan="$(grep -rn 'PLAN §' scripts "$SKILL" "$REFS" README.md docs 2>/dev/null \
+  | grep -v 'stale_plan=' || true)"
+if [ -z "$stale_plan" ]; then pass "no PLAN citations"
+else fail "cites a document that does not exist: $(echo "$stale_plan" | head -2)"; fi
+
+echo "== README names every reference =="
+# README's structure paragraph lists the reference files by name. Nothing read it,
+# so it sat at seven while references/ held ten. A file named there but deleted
+# would still slip past this.
+rmiss=""
+for f in "$REFS"/*.md; do
+  grep -qF "$(basename "$f")" README.md || rmiss="$rmiss $(basename "$f")"
+done
+if [ -z "$rmiss" ]; then pass "README names all $(ls "$REFS"/*.md | wc -l | tr -d ' ') references"
+else fail "README's structure list is missing:$rmiss"; fi
 
 echo "== length budgets =="
 n="$(grep -c "" "$SKILL")"

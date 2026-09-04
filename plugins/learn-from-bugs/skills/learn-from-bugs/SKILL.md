@@ -288,6 +288,9 @@ conversation), then ask what theme this one belongs to rather than only what cla
   in the calendar (crunch weeks, post-refactor, after a handoff between people)?
 - Was a rule already written for this theme? Then the rule is not working, and
   that is the finding rather than the bug.
+- Does the log already hold an entry for the previous fix of this ticket, and what
+  labels does it use? No entry means this procedure did not run last time, which
+  outranks the gate analysis. Reuse a label from that list or justify a new one.
 
 The frequency changes the diagnosis and not only its urgency. One accessibility
 bug is a missing `aria-label`. Nine of them across four features is a planning
@@ -316,6 +319,42 @@ themselves evidence. Day one yields the gate, the bucket, the sideways sweep, an
 a first labeled entry. It does not yet yield the theme, so say that. See
 `references/history-sources.md` for day-one sources and the retrieval move for
 every other place a history might live.
+
+### Before you accept the class
+
+A class you can name is not yet a class that binds. Four checks, in order.
+
+**Check the altitude.** Ask what level the previous fix in this area was pitched
+at. A class that names the same level is the last fix restated rather than a
+generalization, and this is the usual failure: each round is correct in its own
+frame, and the next defect appears one level out. A fix was class-level rather
+than local if it changed a helper whose callers have different contracts, a
+dispatch path that fans out, or a shared listener landing in more than one place.
+When one of those holds and the verification touched a single consumer, the
+verification was instance-level for a class-level fix.
+
+**Test "we already have a rule for that."** Count how often the rule was actually
+cited in the artifacts it governs. Zero citations means it was never
+operationalized, whatever the document says, and the rule's binding is the finding
+rather than the bug. Then discount the lucky instances, where something was caught
+only because a ticket happened to name it, and recompute the miss rate without
+them.
+
+**Mint a slot, not a label.** A class is real when a later session cannot produce
+a passing artifact without filling in something the class owns. Answer these five.
+If you cannot, what you have is a label:
+
+1. What question would have caught this that the acceptance criteria never asked?
+2. What written artifact holds that answer, and does it exist before work starts?
+3. Which two moments check it, one preventive and one catching an escape?
+4. Can the trigger be derived from a diff, or does it need a reader's judgment?
+5. What are the closed-set outcomes, per thing walked?
+
+**Scope it to what you saw.** Generalizing from one instance is abstraction at n
+equals one, so the class travels with the conditions under which it applies rather
+than as a universal. Widening those conditions is a later edit that a second
+instance pays for. Stated wider than its evidence, a class produces a rule nobody
+can point at when they ask why it exists.
 
 ## 5. Land a change that matches the evidence
 
@@ -355,9 +394,67 @@ done in the gaps.
 
 Append to your incident log as `## YYYY-MM-DD — Consequence`, so what happened,
 then why nothing caught it, then the rule it produces, with the issue ID, the
-class from step 4, and the sweep result. Not a sequence number, because `## 2.`
+class from step 4, and the sweep result. Every change you land carries the number
+of the mechanism it is, from the step 5 menu, and one incident usually lands
+several. The number is a claim rather than a label, so a change that only partly
+earns its number says which narrower claim it does earn: a check that has never
+been red against the defect is not a 1, whatever it is wired into. Numbers make
+an altitude check possible later, since a run of entries at 3 and below says the
+theme has never been fixed mechanically, and that is a finding about the theme
+rather than about any one bug. Not a sequence number, because `## 2.`
 assumes one writer appending in turn, and parallel agents each append a different
 one at the same line, in different branches, none aware of the others.
+
+### The block every entry ends with
+
+The prose above it is for a reader. This block is for the next run of this
+procedure and for the gate that refuses an entry without it, so it is fixed
+shape, one field per line, after the prose:
+
+```
+Class: <a label already in this log>          or: Class: new — <why no existing label fits>
+Instance: <N>                                 N is 1 + the priors marked same-theme below
+Level: call-site | contract | convention | process
+Bucket: missing | unread | unrecorded | misunderstood | none    from 3b; none = a gate existed and did not fire
+Not one up: <the next level, and why it was rejected>   (omit only at process)
+Sweep: `<command>` → <what it returned>       one line per search, sideways
+Priors: `<command>` → <k nominated>           the backward retrieval
+- YYYY-MM-DD: same-theme | adjacent | unrelated
+Landed: <mechanism 1-10> <what>               one line per change; 1 and 2 need "red: <how it failed>"
+Critic: ran | not-run
+```
+
+A gate refuses the entry, and it is worth being exact about what it checks,
+because the rest is the critic's. Checked: the label matches one the log already
+uses, so the sweep can find it next time, or says why none fits. Each prior row
+is the date of a real entry. The bucket is one of the four from 3b, or `none`.
+Git is asked which entries share a day with a commit on a file this fix touches,
+and every one of those must appear as a row, so the candidates are not yours to
+choose, only the verdict on each. The files this fix touches are the uncommitted
+ones; if there are none, every file changed since the log was last committed, so
+a fix landed in several commits is still one fix; and in a repo whose log has
+never been committed, the files of the last commit. A wide window there means the
+log is stale, which is a finding in itself. The instance number equals one plus
+the rows marked same-theme, and it selects the row of step 5's table. Every
+`Sweep:` command is run, in the repo, and the observation after the arrow must
+match what came back: a number equal to the line count, "nothing" against empty
+output, or a quoted fragment or path found in it verbatim. A command the gate
+will not run (anything beyond `git log`, `gh issue list`, `grep`, `find` and
+their read-only kin, or anything with a pipe into a write) is refused with the
+reason. Mechanism 1 or 2 must say how it was seen red.
+
+Not checked, and not pretended to be: whether a disposition is right, whether
+the level is the true altitude, and whether the line under it names the level
+that was really left in place. An entry that marks every nominated prior
+`unrelated` and lands at call-site passes the gate. That is the shape step 7's
+critic is handed the log to catch, and its question 4 is asked against these
+rows.
+
+The gate is `hooks/ledger-gate.mjs`, shipped with the plugin and fired on `Write`
+and `Edit` to any `LESSONS.md` (another log name needs a matching handler in
+your own hooks and `LFB_LOG_NAME`; `LFB_LEDGER_MODE=warn` records without
+refusing). Existing entries re-save and retitle freely; only added entries are
+read. A write from the shell bypasses it.
 
 The middle part is the one that gets skipped and the only one that generalizes,
 since it tells a future project which class of check it is missing even when this
@@ -392,7 +489,9 @@ have to go and find later either, because a pass owed to a later session is one
 this run did not have.
 
 Send the artifacts and not the reasoning, so the change, every check it
-introduces, the incident entry, and the commands the sweep actually ran. Narrative
+introduces, the incident entry, the log it was appended to, and the commands the
+sweep actually ran. The log is what question 4 is answered against, and the
+entry's Priors rows are the claims it checks. Narrative
 is what carries the frame across. Five questions, each answerable from those
 artifacts without re-deriving the analysis, which is what keeps the pass cheap and
 hard to rubber-stamp:

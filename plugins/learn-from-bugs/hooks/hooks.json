@@ -1,0 +1,22 @@
+{
+  "description": "learn-from-bugs: a new incident-log entry lands only with the step 6 ledger block, checked against the log, git, and the repo rather than read as prose. Two handlers because `if` holds exactly one permission rule.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Write(**/LESSONS.md)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/ledger-gate.mjs\""
+          },
+          {
+            "type": "command",
+            "if": "Edit(**/LESSONS.md)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/ledger-gate.mjs\""
+          }
+        ]
+      }
+    ]
+  }
+}

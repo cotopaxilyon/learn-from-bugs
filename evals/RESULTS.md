@@ -212,3 +212,65 @@ are what that widening addresses.
 
 D4's theme in run 1 was sourced from an unmerged worktree branch. See
 `SKILL.md` step 4, "Unmerged work is not history," which that run produced.
+
+## Run 7, 2026-09-02, Opus, four runs on the date-validity fixture
+
+First run of any kind against an outcome rather than a trigger, and the first with
+two runs per arm. Candidate is the working tree, baseline is the installed 1.1.0.
+Scored by `evals/score.mjs`, twelve mechanical signals, no prose read.
+
+| Signal | cand-1 | cand-2 | base-1 | base-2 |
+|---|---|---|---|---|
+| references opened | 3 | 2 | 0 | 0 |
+| mechanism rank cited | no | yes (3, 2, 10) | no | no |
+| all three prior incidents cited | yes | yes | yes | yes |
+| symptom fixed | yes | yes | yes | yes |
+| suite green | yes | yes | yes | yes |
+| round-trip fix | no | yes | no | no |
+
+**The reference read replicated and nothing else did.** Both candidate runs opened
+references, both baseline runs opened none. That is the mechanism where step 6
+requires a number the reference alone defines, so the entry cannot be completed
+without opening it.
+
+**Everything else is a null result.** All four arms found the theme, fixed the
+symptom and kept the suite green. On outcome the arms are indistinguishable, so
+the class-minting block added to step 4 the same day is unmeasured, and the stock
+skill reaches the theme on this fixture without it.
+
+**The rank fires unreliably.** One candidate run in two produced a number. The
+read is caused; the number is not.
+
+**Two corrections.** The answer key claimed only a round-trip check both fixes the
+symptom and keeps the suite green. Three arms fixed it without one. And within the
+candidate arm two runs disagreed on two of twelve signals, so every single-run
+comparison recorded earlier that day was not evidence.
+
+## Run 8, 2026-09-03, Opus, the ledger gate driven through Claude Code
+
+First run against a hook rather than the skill text. `evals/drive-ledger-gate.sh`,
+four `claude -p` arms in a two-entry fixture repo, each asked to add a
+2026-09-03 entry to `docs/LESSONS.md` with Write or Edit, once bare and once with
+the step 6 block. Verdicts read from `permission_denials` in the result JSON and
+from the file on disk, not from prose.
+
+| Arm | Original wiring (`Write\|Edit(...)`, one handler) | Shipped wiring (two handlers) |
+|---|---|---|
+| write-bare | landed, no denial | **denied**, nothing landed |
+| write-good | landed | landed |
+| edit-bare | landed, no denial | **denied**, nothing landed |
+| edit-good | landed | landed |
+
+**The original wiring never fired.** A fresh-context critic found it first, in a
+four-arm drive of its own on the same day; this run reproduces it with the
+script that now ships. The `if` field holds one permission rule, and
+`Write|Edit(**/LESSONS.md)` is skipped without a message. Unit tests and
+`check.sh` were green throughout, which is the 2026-09-01 entry's class applied
+to this repo's own hook.
+
+**The drive script's first version also read the wrong signal.** It grepped the
+result JSON for the deny reason, which is shown to the model and not written to
+the result, so a working gate scored as two failed arms. Fixed to read
+`permission_denials`. One run per arm; the deny and land outcomes are categorical
+enough that a second run would add little, but that is a judgment and not a
+measurement.

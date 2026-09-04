@@ -4,3 +4,7 @@
 
 # Eval output is a local signal, not an artifact.
 evals/results/
+
+# Maintainer notes: plans, proposals, handoffs. Not published with the skill;
+# published files may not cite anything in here (check.sh asserts it).
+docs/internal/

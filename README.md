@@ -151,6 +151,14 @@ visible rather than described.
 That split is the skill taking its own advice. A rule buried on page four of a
 long file fails the same way a requirement buried in comment #14 does.
 
+`hooks/` holds the one mechanical part. A new entry in your `LESSONS.md` lands
+only with the block step 6 specifies, and the gate checks the block against the
+log, git, and the repo rather than reading it: the label must already exist or
+say why not, the priors are nominated by git and only dispositioned by you, and
+every sweep command is run and scored against its output. `LFB_LEDGER_MODE=warn`
+records without refusing. It is a cooperative backstop, not a wall: a write from
+the shell goes around it.
+
 ## License
 
 MIT

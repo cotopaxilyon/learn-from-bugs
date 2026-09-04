@@ -62,6 +62,11 @@ gh issue list --state closed --limit 200 --json number,title,labels,closedAt
 gh pr list --state merged --limit 200 --json number,title,body,mergedAt
 ```
 
+Drop `--json` when something downstream counts lines or looks for issue numbers:
+piped rather than shown in a terminal, the JSON form is one line however many
+issues it holds, while the default form is one tab-separated line each,
+beginning with a bare number.
+
 Filter to the window yourself. Fidelity: high where the repo labels issues,
 **medium** where it doesn't. PR titles are a weaker signal than a label but a
 much stronger one than nothing.

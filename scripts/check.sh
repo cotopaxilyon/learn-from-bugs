@@ -8,11 +8,6 @@ cd "$(dirname "$0")/.."
 
 SKILL="plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md"
 REFS="plugins/learn-from-bugs/skills/learn-from-bugs/references"
-# Raised 2026-09-01 from 430, for step 7 and the fifth class family. The previous
-# fit was bought partly by compressing baseline prose, and a voice check against
-# the published copy flagged two of those compressions as meaning lost. Ten lines
-# is the cost of the step, not a licence for the next one.
-SKILL_BUDGET=440
 REF_BUDGET=200
 # Per-file override. history-sources.md is the canonical home for retrieval:
 # every other file points at it and may not restate it, which the tracker-name
@@ -56,6 +51,21 @@ for tracker in Linear Jira Shortcut "Azure DevOps" Slack Discord Zendesk Interco
   hits="$(grep -rlF "$tracker" "$REFS" "$SKILL" 2>/dev/null | grep -v 'history-sources.md' || true)"
   if [ -z "$hits" ]; then pass "$tracker only in history-sources.md"
   else fail "$tracker also appears in: $(echo "$hits" | tr '\n' ' ')— retrieval has one home"; fi
+done
+
+echo "== agent-testing guidance lives in exactly one file =="
+# Same rule as retrieval above, for the same reason, learned the harder way. The
+# section in SKILL.md summarised agent-and-context.md well enough to act on, so a
+# 2026-09-01 trigger run fired the skill, answered from the summary, and never
+# opened the file the section tells it to open. A summary complete enough to
+# satisfy a reader is a summary that replaces the read. Names of the three holes
+# stay in SKILL.md; the procedure does not. Phrases are load-bearing lines from
+# the reference, not vocabulary, so a restatement trips this and a passing
+# mention does not.
+for phrase in "independent source of truth" "Transcripts are not storage" "hook or CI check" "felt sense" "carries no information"; do
+  hits="$(grep -rlF "$phrase" "$REFS" "$SKILL" 2>/dev/null | grep -v 'agent-and-context.md' || true)"
+  if [ -z "$hits" ]; then pass "\"$phrase\" only in agent-and-context.md"
+  else fail "\"$phrase\" also appears in: $(echo "$hits" | tr '\n' ' ')— the summary is regrowing"; fi
 done
 
 echo "== no unsupported claims about a population =="
@@ -140,6 +150,43 @@ stale_plan="$(grep -rn 'PLAN §' scripts "$SKILL" "$REFS" README.md docs 2>/dev/
 if [ -z "$stale_plan" ]; then pass "no PLAN citations"
 else fail "cites a document that does not exist: $(echo "$stale_plan" | head -2)"; fi
 
+echo "== step 6 states the closed sets the gate enforces =="
+# The block's fields are closed sets in ledger-gate.mjs. Step 6 is where a
+# reader learns them, and prose that drifts from the exported sets teaches a
+# shape the gate refuses. Grep each value out of the hook and require it in the
+# step 6 section. The nomination sentence gets its own assertion because it is
+# prose describing a rule, not a value: it said "the commit at HEAD" for a day
+# after the rule stopped always reading HEAD.
+# Scoped to the fenced block, not the whole section: "none" and "process" and
+# "contract" all occur in step 6's prose, so a section-wide grep passed for a
+# value the block had dropped. Watched failing on a dropped "misunderstood" and,
+# after the narrowing, on a dropped "none" too.
+step6="$(sed -n '/^## 6\. Record it/,/^## 7\./p' "$SKILL" | sed -n '/^```$/,/^```$/p')"
+gate="plugins/learn-from-bugs/hooks/ledger-gate.mjs"
+sets_ok=1
+for value in call-site contract convention process missing unread unrecorded misunderstood none same-theme adjacent unrelated; do
+  grep -qF "'$value'" "$gate" || { fail "\"$value\" is not a closed-set value in ledger-gate.mjs"; sets_ok=0; }
+  printf '%s' "$step6" | grep -qF "$value" || { fail "step 6's block never offers the closed-set value \"$value\""; sets_ok=0; }
+done
+[ "$sets_ok" -eq 1 ] && pass "step 6 names every closed-set value the gate enforces"
+step6_prose="$(sed -n '/^## 6\. Record it/,/^## 7\./p' "$SKILL")"
+if printf '%s' "$step6_prose" | grep -q 'since the log was last committed'; then
+  pass "step 6 states the touched-file rule the gate implements"
+else
+  fail "step 6 no longer describes how the gate picks the files this fix touches"
+fi
+
+echo "== published files never cite a maintainer note =="
+# Plans, proposals and handoffs live in docs/internal/, which is gitignored so
+# clients do not see them. A published file citing one points at a path that
+# does not exist in the clone, the same class as the removed PLAN citations
+# above, with the extra cost that the reader learns an internal document exists.
+internal_cite="$(grep -rnE 'docs/internal|PROPOSAL-20[0-9]{2}|HANDOFF-20[0-9]{2}|PLAN-20[0-9]{2}' \
+  README.md docs/LESSONS.md docs/PRINCIPLES.md evals scripts "$SKILL" "$REFS" 2>/dev/null \
+  | grep -v 'internal_cite=' | grep -v '^scripts/check.sh:.*#' || true)"
+if [ -z "$internal_cite" ]; then pass "no published file cites an internal document"
+else fail "published file cites an internal document: $(echo "$internal_cite" | head -2)"; fi
+
 echo "== README names every reference =="
 # README's structure paragraph lists the reference files by name. Nothing read it,
 # so it sat at seven while references/ held ten. A file named there but deleted
@@ -151,10 +198,11 @@ done
 if [ -z "$rmiss" ]; then pass "README names all $(ls "$REFS"/*.md | wc -l | tr -d ' ') references"
 else fail "README's structure list is missing:$rmiss"; fi
 
-echo "== length budgets =="
-n="$(grep -c "" "$SKILL")"
-if [ "$n" -le "$SKILL_BUDGET" ]; then pass "SKILL.md $n/$SKILL_BUDGET lines"
-else fail "SKILL.md is $n lines, budget $SKILL_BUDGET — move material to references/, do not raise the cap"; fi
+# SKILL.md has no cap. It had one from the first commit, never earned by an
+# incident, and it was raised three times on 2026-09-02 alone. See
+# docs/LESSONS.md, 2026-09-02. The reference caps below stay: references exist
+# to hold what SKILL.md pushed out, so a 200-line reference is a failed split.
+echo "== reference length budgets =="
 for f in "$REFS"/*.md; do
   n="$(grep -c "" "$f")"
   case "$(basename "$f")" in
@@ -162,7 +210,7 @@ for f in "$REFS"/*.md; do
     *) budget="$REF_BUDGET" ;;
   esac
   if [ "$n" -le "$budget" ]; then pass "$(basename "$f") $n/$budget lines"
-  else fail "$(basename "$f") is $n lines, budget $budget — move material, do not raise the cap"; fi
+  else fail "$(basename "$f") is $n lines, budget $budget. Cut it, or raise the cap in a comment naming what was considered for removal."; fi
 done
 
 echo "== manifests validate =="

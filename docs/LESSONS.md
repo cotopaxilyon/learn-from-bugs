@@ -12,6 +12,79 @@ point of the log: entries here are inputs, and the checks are the output.
 
 ---
 
+## 2026-09-03 — A gate shipped green and could not fire, because its filter was not a permission rule
+
+**What happened.** The first version of `hooks/ledger-gate.mjs` landed with one
+`hooks.json` handler filtered by `"if": "Write|Edit(**/LESSONS.md)"`. Fourteen
+unit tests passed, `check.sh` passed, and the script refused a bare entry on
+stdin. Driven through Claude Code, the handler never ran: the `if` field holds
+exactly one permission rule, `Write|Edit(...)` is not one, and a handler whose
+rule does not parse is skipped without a message. A bare entry landed in the log
+with an empty `permission_denials` list. A fresh-context critic found it by
+running four arms that differed in the `if` value alone.
+
+**Why nothing caught it.** Every check exercised the script and none exercised
+the wiring. The tests drive `decide()` and stdin; `check.sh` reads files; the
+replay of this log's newest entry went through stdin too. A hook that cannot
+fire produces the same output as a hook with nothing to refuse, so green was the
+only colour available. The 2026-09-01 entry names this class for other people's
+checks and the repo did not apply it to its own first hook.
+
+**The rule.** A hook is not landed until it has been driven through the harness
+that runs it and seen to refuse. `evals/drive-ledger-gate.sh` does that in four
+arms, Write and Edit, bare and complete, and `LFB_PLUGIN_DIR` points it at a copy
+carrying the original wiring so the red run stays reproducible. The wiring is now
+two handlers, one rule each.
+
+Class: new — a wired check that cannot fire; the 2026-09-01 entry is this class and carries no label
+Instance: 2
+Level: convention
+Not one up: process would be a release checklist line, and a line can only point at the drive script, which is the convention itself
+Sweep: `grep -n '"if"' plugins/learn-from-bugs/hooks/hooks.json` → 2 handlers, one rule each
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/hooks scripts/check.sh` → 2 nominated
+- 2026-09-01: same-theme
+- 2026-08-31: adjacent
+Landed: 2 evals/drive-ledger-gate.sh, red: with the original single handler both bare arms land and permission_denials is empty (drive-red, 2026-09-03)
+Landed: 3 SKILL.md step 6 now lists what the gate checks and what it leaves to the critic
+Critic: ran
+
+## 2026-09-02 — A cap nobody had earned moved three times in one day
+
+**What happened.** `SKILL.md` had a line cap in `check.sh` from the first commit.
+It fired four times on 2026-09-02 and was raised every time: 440 to 470 for a
+class-minting block, to 476 when an earlier cut was reverted, to 480 for the
+mechanism rank. Each raise was argued in a comment. All four were allowed.
+
+**Why nothing caught it.** The cap was 430 when the file was 423 lines, so the
+number was the current length plus seven, and the commit that added it cited a
+PLAN section in a document that has since been deleted. No entry in this log
+records a time `SKILL.md` was too long, and `PRINCIPLES.md` makes no argument for
+a ceiling. Every other check here was written after something went wrong. This one
+was written after nothing, so there was no failure behind it to hold a raise
+against, and the review it forced was always going to end in yes.
+
+**The rule.** A check in `check.sh` owes an entry in this log. Where the entry
+would be blank, the check is guessing at a cost nobody has paid, and it will teach
+whoever meets it that the rule is negotiable, which is worse than the absence of a
+rule. The `SKILL.md` cap is deleted. The reference caps stay, because references
+exist to hold what `SKILL.md` pushed out and a 200-line reference is a failed
+split rather than a long file.
+
+The real concern the cap was reaching for is stated better in
+`references/agent-and-context.md`: attention is finite even when the tokens are
+present, and a rule buried on page four has the failure mode of a requirement
+buried in comment fourteen. That is about what competes for attention, which a
+line count does not measure.
+
+Class: check without a forcing instance. Sweep: not run, and it was written up as
+though it had been. `check.sh` has 15 check sections and this log had 11 entries
+before this one, so whether each check traces to an entry is open and is the first
+thing to settle. Recording it this way rather than deleting it, because a
+fabricated sweep in the entry that argues checks must be earned is the more useful
+artifact. Mechanism 3, a written-down rule, because a
+check asserting that every check cites an incident would have to parse prose that
+this file does not write in a fixed shape.
+
 ## 2026-09-01 — The critic proposed for step 7 was the self-audit this skill rejects
 
 **What happened.** The session write-up that produced today's other two entries

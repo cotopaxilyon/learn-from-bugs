@@ -17,7 +17,10 @@ not stop applying because the artifact is a write-up rather than a test.
 **It is also not "review this analysis."** A general critic handed the reasoning
 adopts the frame that reasoning was written in and blesses it. So the brief is
 the artifacts and not the narrative: the change, every check it introduces, the
-incident entry, and the commands the sweep actually ran. Every question below is
+incident entry, the incident log it was appended to, and the commands the sweep
+actually ran. The log is there so question 4 has something to read, and the
+entry's Priors rows are the specific claims it reads them against: a prior marked
+unrelated that shares the entry's mechanism is the finding. Every question below is
 answerable from those alone, without re-deriving the analysis, which is what
 makes the pass cheap and what makes it hard to rubber-stamp.
 

@@ -101,6 +101,49 @@ if grep -qiE 'five real issues' README.md; then
   fail "README claims five real examples; examples.md labels one illustrative"
 else pass "example provenance is stated honestly"; fi
 
+echo "== the tree-rewriting rule is stated for whoever holds the work =="
+# It was stated, correctly, in critic-pass.md, naming `git checkout -- <file>` and
+# its exact consequence, and addressed to the critic. The author ran that command
+# on the live tree the next day and discarded two sessions of uncommitted edits.
+# The rule was not missing and was not misread; its scope excluded the reader who
+# needed it. Step 1 is the general home. Every other file points at it and may not
+# restate the command list, the same single-home rule as retrieval and
+# agent-testing above, so the scope cannot silently narrow again.
+# Every form, not one of them. The first version of this check greppped for
+# `git checkout -- ` alone, so the other five could be deleted and it stayed
+# green: the check was narrower than the rule it guarded, which is the incident it
+# exists to catch, reappearing inside its own fix. A fresh critic measured it.
+step1="$(sed -n '/^## 1\./,/^## 2\./p' "$SKILL")"
+missing=""
+for c in 'git checkout -- ' 'git checkout <ref> -- ' 'git restore ' 'git reset --hard' 'git clean -f' 'git stash'; do
+  printf '%s' "$step1" | grep -qF "$c" || missing="$missing \`$c\`"
+done
+if [ -n "$step1" ] && [ -z "$missing" ] && printf '%s' "$step1" | grep -qi 'run on a copy'; then
+  pass "step 1 names all six tree-rewriting forms and the copy rule"
+else fail "step 1 no longer states the whole rule; missing:${missing:- the copy rule}"; fi
+# Searched: every published .md and .mjs under plugins/, plus README.md and
+# docs/. Stated exemptions. SKILL.md owns the list. docs/LESSONS.md records the
+# commands that caused the incidents. The gitignored maintainer-note directory is
+# pruned in the find rather than named in the case, so this line does not itself
+# trip the citation check below.
+# ledger-gate.mjs and its test name the same
+# subcommands as the ones held out of ALLOWED, which is a statement about what the
+# gate executes, not about the tree. The file count is asserted because the first
+# version searched two paths, reported repo-wide, and would have gone green if
+# either path were renamed: a negative case that reads as a pass, which is the
+# 2026-09-01 entry.
+searched=0
+restated=""
+for f in $(find plugins/learn-from-bugs README.md docs -type d -name internal -prune -o \( -name '*.md' -o -name '*.mjs' \) -print | sort); do
+  case "$f" in */SKILL.md|*/LESSONS.md|*/ledger-gate.mjs|*/ledger-gate.test.mjs) continue ;; esac
+  searched=$((searched + 1))
+  hit="$(grep -n 'git checkout\|git restore\|git reset --hard\|git clean -f\|git stash' "$f" || true)"
+  [ -n "$hit" ] && restated="$restated $f:$(printf '%s' "$hit" | head -1 | cut -c1-60)"
+done
+if [ "$searched" -lt 10 ]; then fail "the restatement search covered only $searched files, so the paths have moved and this check is measuring nothing"
+elif [ -z "$restated" ]; then pass "none of the $searched files searched restates the command list step 1 owns"
+else fail "the command list is restated outside step 1:$restated"; fi
+
 echo "== the eval procedure gates on the registry =="
 # A trigger run without a confirmed registry measures nothing, and its negative
 # case reads as a pass. The rule was recorded in docs/LESSONS.md and never
@@ -174,6 +217,59 @@ if printf '%s' "$step6_prose" | grep -q 'since the log was last committed'; then
   pass "step 6 states the touched-file rule the gate implements"
 else
   fail "step 6 no longer describes how the gate picks the files this fix touches"
+fi
+# The mint shape, asserted against the block rather than the prose for the reason
+# given above. A mint that is only a reason registers that reason as the label,
+# and until 2026-09-04 a mint registered nothing at all, so the label reuse the
+# backward sweep runs on had never once worked.
+if printf '%s' "$step6" | grep -qF 'new — <the label>; <why'; then
+  pass "step 6's block shows the mint shape, naming the label before the reason"
+else
+  fail "step 6's block no longer shows a mint that names its label first, which is what joins the reusable set"
+fi
+# The prior row names an entry, not a day. Asserted against the block because the
+# block is what an agent copies: three days in this repo's own log carry more
+# than one entry and one carries seven, so a bare date was a verdict on all of
+# them and the gate scored it as a match. Watched failing against the old
+# "- YYYY-MM-DD: same-theme" line.
+if printf '%s' "$step6" | grep -qE '^- YYYY-MM-DD <[^>]*heading>:.*same-theme'; then
+  pass "step 6's block shows a prior row keyed to an entry, not to a day"
+else
+  fail "step 6's block no longer asks a prior row to name which entry on that day was read"
+fi
+# Every deny code the gate defines is named in the test file, which is the rule
+# that file opens with. The first version of this asserted one code by name,
+# which goes green on the identifier appearing in a comment and says nothing
+# about the next code somebody adds: a check answering a cheaper question than
+# its rule, which is the 2026-09-01 entry. A code named only in a comment still
+# slips past this, and the test file's own header is what asks for the red run.
+gate_test="plugins/learn-from-bugs/hooks/ledger-gate.test.mjs"
+audit="scripts/gate-existing-entries.mjs"
+audit_test="scripts/gate-existing-entries.test.mjs"
+untested=""
+for code in $(grep -o 'deny_[a-z_]*' "$gate" | sort -u); do
+  grep -qF "$code" "$gate_test" || untested="$untested $code"
+done
+for code in $(grep -o 'deny_[a-z_]*' "$audit" | sort -u); do
+  grep -qF "$code" "$audit_test" "$gate_test" || untested="$untested $code"
+done
+if [ -z "$untested" ]; then pass "every deny code the gate defines is named in its tests"
+else fail "deny codes with no test:$untested"; fi
+
+echo "== the log satisfies the gate that guards it ==" 
+# The gate reads only the entries a write adds, so everything already on disk is
+# invisible to it. A grammar change therefore lands green beside a log full of
+# the shape it just started refusing, which is what happened on 2026-09-04: the
+# prior row was re-keyed from a day to an entry and the log's own newest entry
+# still said "- 2026-08-31: adjacent", one verdict standing for eight entries.
+# Static grammar only. The script does not execute Sweep or Priors commands and
+# does not ask git for nominations, because those observations were true when
+# written and drift with the tree. See the header of the script for the scope
+# and for what an entry has to be excused by name.
+if node scripts/gate-existing-entries.mjs >/dev/null 2>&1; then
+  pass "every entry in the log satisfies the grammar the gate enforces today"
+else
+  fail "$(node scripts/gate-existing-entries.mjs 2>&1 | head -1)"
 fi
 
 echo "== published files never cite a maintainer note =="

@@ -84,6 +84,16 @@ observed-versus-expected, the environment, all copied somewhere durable first.
 Once the fix lands the evidence is gone, and steps 3 and 4 become guesswork about
 a state nobody can observe any more.
 
+**Investigating destroys evidence too, and this is the one worth naming.** The
+uncommitted tree is the state you are reasoning about, and a command that
+rewrites the working tree from the index or a commit discards it silently and
+reports nothing: `git checkout -- <file>`, `git checkout <ref> -- <file>`,
+`git restore <file>`, `git reset --hard`, `git clean -f`, `git stash`. So
+experiments that need a dirty file run on a copy, and the tree is left as found.
+A question about what a file used to say is answered by a read, of git or of the
+copy, never by a restore. This applies to whoever is holding the work, not only
+to the reader dispatched at step 7.
+
 Then reproduce, ideally as a failing test. When it cannot be one (a visual
 regression, a layout that only breaks at a width, a flow that is wrong rather than
 broken), stop and note why. That is not an inconvenience, it is the finding: you
@@ -412,30 +422,45 @@ procedure and for the gate that refuses an entry without it, so it is fixed
 shape, one field per line, after the prose:
 
 ```
-Class: <a label already in this log>          or: Class: new — <why no existing label fits>
+Class: <a label already in this log>          or: Class: new — <the label>; <why no existing label fits>
 Instance: <N>                                 N is 1 + the priors marked same-theme below
 Level: call-site | contract | convention | process
 Bucket: missing | unread | unrecorded | misunderstood | none    from 3b; none = a gate existed and did not fire
 Not one up: <the next level, and why it was rejected>   (omit only at process)
 Sweep: `<command>` → <what it returned>       one line per search, sideways
 Priors: `<command>` → <k nominated>           the backward retrieval
-- YYYY-MM-DD: same-theme | adjacent | unrelated
+- YYYY-MM-DD <words from that entry's heading>: same-theme | adjacent | unrelated   one row per prior
 Landed: <mechanism 1-10> <what>               one line per change; 1 and 2 need "red: <how it failed>"
 Critic: ran | not-run
 ```
 
 A gate refuses the entry, and it is worth being exact about what it checks,
 because the rest is the critic's. Checked: the label matches one the log already
-uses, so the sweep can find it next time, or says why none fits. Each prior row
-is the date of a real entry. The bucket is one of the four from 3b, or `none`.
+uses, so the sweep can find it next time, or mints one. A mint names the label
+first and the reason after a semicolon, because the label is what joins the set
+and a reason written about this entry is not something a later one can reuse. Each prior row names one entry:
+the date, then enough of that entry's heading to pick it out from the others on
+the same day, and the pair has to resolve to exactly one. A bare date is refused,
+and so is a substring matching two entries, because several days in a log carry
+several entries and a row that says "one of these" was being read as a verdict on
+all of them. Two rows resolving to the same entry are refused too.
+A line among the rows that looks like a row and is not one is refused rather
+than skipped, because a row the gate cannot parse used to vanish and take the
+prior it claimed with it. Two entries can never share both a date and a heading:
+no fragment separates them, so nothing an author writes would satisfy the gate.
+That one is a property of the log rather than of an entry, so the gate cannot
+see it: a heading already on disk reads as a re-save and never arrives as a new
+entry. It is caught by a check over the whole log instead. The bucket is one of the four from 3b, or `none`.
 Git is asked which entries share a day with a commit on a file this fix touches,
 and every one of those must appear as a row, so the candidates are not yours to
-choose, only the verdict on each. The files this fix touches are the uncommitted
+choose, only the verdict on each. Every entry on such a day is nominated, not one
+per day: a day-keyed nomination let a single verdict close out every entry
+sharing it, which is a check that cannot fail. The files this fix touches are the uncommitted
 ones; if there are none, every file changed since the log was last committed, so
 a fix landed in several commits is still one fix; and in a repo whose log has
 never been committed, the files of the last commit. A wide window there means the
 log is stale, which is a finding in itself. The instance number equals one plus
-the rows marked same-theme, and it selects the row of step 5's table. Every
+the entries marked same-theme, counted once each, and it selects the row of step 5's table. Every
 `Sweep:` command is run, in the repo, and the observation after the arrow must
 match what came back: a number equal to the line count, "nothing" against empty
 output, or a quoted fragment or path found in it verbatim. A command the gate

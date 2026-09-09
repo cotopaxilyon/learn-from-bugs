@@ -12,6 +12,141 @@ point of the log: entries here are inputs, and the checks are the output.
 
 ---
 
+## 2026-09-04 — Thirteen entries in, the log had never once been able to reuse a label
+
+**What happened.** Writing the entry below, the class that fitted was the one the
+2026-09-03 entry had minted, "a wired check that cannot fire". The gate refused
+it: `deny_class_unknown`, no such label in the log. `classLabelsIn` dropped every
+`Class: new — ...` line before building the set, so a mint registered nothing.
+The set could only ever grow from a bare label, and the gate refuses a bare label
+unless it is already in the set. Unreachable by construction. Every entry the log
+will ever hold has to mint again, and step 4's backward sweep, which runs on
+labels being reused, had never had a label to find.
+
+**Why nothing caught it.** Four unit tests covered the `Class:` field: an unknown
+label is denied, a bare reused label passes, a justified mint passes, an empty
+mint is denied. All four are true and the feature is still broken, because each
+of them reads a set that the fixture had already been written with bare labels
+in. The mint half and the reuse half were never run against each other. The
+grammar had the same hole one level up: `Class: new — <why no existing label
+fits>` names a reason and never a label, so even with the code fixed there was
+nothing to register. Nobody wrote down that a mint owes the log a reusable label,
+so no test could be missing. The other entry from this sitting is marked adjacent
+rather than same-theme, and the line is thin: its class describes this escape
+well, four checks each true inside its own stated scope. The defect itself is the
+other one, a path that could never take effect, so the class names that.
+
+**The rule.** Where a feature is a round trip, the test runs the trip. A test
+that seeds the state the feature is supposed to produce cannot see that the
+feature never produces it, and it reads exactly like a test that can.
+`ledger-gate.test.mjs` now puts the minting entry through the gate and appends it
+only once accepted, then reuses its label bare from a second entry. `SKILL.md`
+step 6 asks for `new — <the label>; <why no existing label fits>`, and the gate
+refuses a mint whose label is empty as well as one with no separator.
+`scripts/check.sh` asserts that the block still shows that shape, and that every
+deny code the gate defines is named in its tests. This entry is the first label
+reuse the log has performed.
+
+The first version of this fix carried the defect it closes. A mint written
+`new — ; <reason>` cleared a separator-only check and still registered nothing,
+and the test seeded the minted line by hand, so it could not see that. The
+check.sh half asserted that one deny code appeared somewhere in the gate source,
+which goes green on a comment. A fresh critic found all three. Third fix at this
+level, too, which is the finding under the finding: 2026-09-01 and 2026-09-03
+both landed this class at convention and so does this one, and step 4's altitude
+check reads a run like that as the level being wrong rather than the fix.
+
+A violation that would still pass: a mint whose label is a sentence nobody would
+type again, which the gate cannot judge and the critic can, and a deny code named
+only in a test file's comment.
+
+The 2026-08-31 row below was migrated on 2026-09-09 from a day-keyed row that
+named no entry at all. Eight entries share that day and the original said only
+"2026-08-31", so the entry named here is a reconstruction on class similarity,
+not a record of what was read. That is what a day-keyed row costs after the
+fact, and it is why the key changed.
+
+Class: a wired check that cannot fire
+Instance: 3
+Level: convention
+Bucket: missing
+Not one up: process would be a review step or a role over the test suite, and the surface that binds here is the test file itself
+Sweep: `grep -n 'const v = \|onDisk: log' plugins/learn-from-bugs/hooks/ledger-gate.test.mjs` → 2 sites, the shared helper every Class test reads from a hand-written fixture, and the one log a test now produces
+Sweep: `grep -n 'classLabelsIn' plugins/learn-from-bugs/hooks/ledger-gate.mjs` → 2 sites, one building the set and one reading it
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/hooks/ledger-gate.mjs plugins/learn-from-bugs/hooks/ledger-gate.test.mjs plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md scripts/check.sh` → 3 nominated
+- 2026-08-31 Three trigger tests: adjacent
+- 2026-09-01 Three gates failed while green: same-theme
+- 2026-09-03 A gate shipped green: same-theme
+- 2026-09-04 A command run to answer: adjacent
+Landed: 2 ledger-gate.test.mjs runs the mint-then-reuse trip through the gate and refuses an empty-label mint, red: both fail against the gate as shipped, and the empty-label case fails again against the separator-only check this fix first shipped with
+Landed: 1 scripts/check.sh asserts step 6's block shows the mint shape and that every deny code the gate defines is named in its tests, red: each half watched failing separately on a copy, the second against a renamed deny code
+Landed: 3 SKILL.md step 6 states that a mint names its label before its reason, and why the order matters
+Critic: ran
+
+---
+
+## 2026-09-04 — A command run to answer a readable question discarded two sessions of uncommitted work
+
+**What happened.** A question came up about what `SKILL.md` had said earlier in
+the day. Answering it needed a read. What ran instead was
+`git checkout -- SKILL.md`, which restores the file from the index and discards
+uncommitted changes without printing anything, and two sessions of edits to that
+file went with it. They were recovered in full from a copy made earlier for an
+unrelated run, and verified by diff: only the three intended edits differed. Git
+reported success and said nothing about what it had overwritten.
+
+**Why nothing caught it.** Two controls covered this and both were narrower than
+the hazard. `references/critic-pass.md` named that exact command and that exact
+consequence, in a paragraph addressed to the critic dispatched at step 7. The
+author was not the critic, and the paragraph did not speak to them. The session's
+own permission deny list enumerated the destructive git commands it knew about,
+`reset --hard`, `clean -f`, `push --force`, `branch -D`, `filter-branch`, and
+stopped there. `git checkout -- <file>` and `git restore <file>` were not on it,
+so the command ran with no refusal; probed again in a throwaway repo, the form
+still runs unrefused and still discards the uncommitted line. Neither control was
+missing and neither was misread. Each stated its scope plainly, each scope
+excluded this case, and a stated scope reads as deliberate, so a reader who meets
+one has no reason to check it against the category of hazard it names. That is
+the 2026-09-01 scoped-grep entry in a second form: there a two-path grep
+authorized an absolute sentence, here a five-command list and a one-role
+paragraph authorized a general sense of being covered. The other 2026-09-01 rule,
+that a check is not landed until it has been watched red against its defect,
+would have found both. It is written about the checks you land in step 5, and
+these were controls already in place, inherited and relied on.
+
+**The rule.** A control is only as wide as the case you have watched it refuse,
+and that holds for controls somebody else wrote. The command list and the copy
+rule now live in `SKILL.md` step 1, addressed to whoever is holding the work, and
+`references/critic-pass.md` points at them rather than owning them.
+`scripts/check.sh` asserts that step 1 names all six command forms and the copy
+rule, and that none of the published markdown and hook sources it searches
+restates the list, with its exemptions named in the check and its file count
+asserted so a renamed path fails loudly instead of going green. Both assertions
+were written first with this entry's own defect in them: one grepped for a single
+form of the six, the other searched two paths and read as repo-wide. A fresh
+critic measured that, which is the only reason they are stated correctly here. A
+violation that would still pass: a restatement in a file outside that search, or
+one that contradicts step 1 rather than repeating its commands. The deny-list
+hole is not closed here, because an agent cannot edit its own permission list, by
+design, so that patch belongs to whoever maintains the settings file.
+
+Class: new — a control or a claim whose stated scope is narrower than the hazard it names; the 2026-09-01 scoped-grep entry is this class, which carried no label when this was written
+Instance: 2
+Level: convention
+Bucket: unread
+Not one up: process would be a standing audit of every inherited control against its hazard category, and two instances do not buy a recurring phase
+Sweep: `grep -rn 'git checkout' plugins/learn-from-bugs/skills/learn-from-bugs` → 1 line, in SKILL.md step 1
+Sweep: `grep -rn 'run on a copy' plugins/learn-from-bugs/skills/learn-from-bugs README.md docs/PRINCIPLES.md` → 1 line, in SKILL.md step 1
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md plugins/learn-from-bugs/skills/learn-from-bugs/references/critic-pass.md scripts/check.sh` → 2 nominated
+- 2026-08-31 Correct install instructions: adjacent
+- 2026-09-01 A scoped grep: same-theme
+- 2026-09-04 Thirteen entries in: adjacent
+Landed: 1 scripts/check.sh asserts step 1 names all six command forms and that no published file restates the list, red: with the step 1 paragraph deleted, with two of the six forms deleted, against a reconstruction of the original critic-pass wording, against a restatement in a file the first version did not search, and against a renamed search path that the first version would have passed, all on a copy
+Landed: 6 the command list and the copy rule moved out of references/critic-pass.md, where they addressed the critic, into SKILL.md step 1, where they address whoever holds the work
+Critic: ran
+
+---
+
 ## 2026-09-03 — A gate shipped green and could not fire, because its filter was not a permission rule
 
 **What happened.** The first version of `hooks/ledger-gate.mjs` landed with one
@@ -36,14 +171,15 @@ arms, Write and Edit, bare and complete, and `LFB_PLUGIN_DIR` points it at a cop
 carrying the original wiring so the red run stays reproducible. The wiring is now
 two handlers, one rule each.
 
-Class: new — a wired check that cannot fire; the 2026-09-01 entry is this class and carries no label
+Class: new — a wired check that cannot fire; the 2026-09-01 entry is this class, which carried no label when this was written
 Instance: 2
 Level: convention
+Bucket: unread
 Not one up: process would be a release checklist line, and a line can only point at the drive script, which is the convention itself
 Sweep: `grep -n '"if"' plugins/learn-from-bugs/hooks/hooks.json` → 2 handlers, one rule each
 Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/hooks scripts/check.sh` → 2 nominated
-- 2026-09-01: same-theme
-- 2026-08-31: adjacent
+- 2026-09-01 Three gates failed while green: same-theme
+- 2026-08-31 Three trigger tests: adjacent
 Landed: 2 evals/drive-ledger-gate.sh, red: with the original single handler both bare arms land and permission_denials is empty (drive-red, 2026-09-03)
 Landed: 3 SKILL.md step 6 now lists what the gate checks and what it leaves to the critic
 Critic: ran
@@ -76,14 +212,16 @@ present, and a rule buried on page four has the failure mode of a requirement
 buried in comment fourteen. That is about what competes for attention, which a
 line count does not measure.
 
-Class: check without a forcing instance. Sweep: not run, and it was written up as
-though it had been. `check.sh` has 15 check sections and this log had 11 entries
-before this one, so whether each check traces to an entry is open and is the first
-thing to settle. Recording it this way rather than deleting it, because a
-fabricated sweep in the entry that argues checks must be earned is the more useful
-artifact. Mechanism 3, a written-down rule, because a
-check asserting that every check cites an incident would have to parse prose that
-this file does not write in a fixed shape.
+**A note on this entry's own Sweep.** The sweep was not run, and it was written up
+as though it had been. `check.sh` has 15 check sections and this log had 11
+entries before this one, so whether each check traces to an entry is open and is
+the first thing to settle. Recording it this way rather than deleting it, because
+a fabricated sweep in the entry that argues checks must be earned is the more
+useful artifact. Mechanism 3, a written-down rule, because a check asserting that
+every check cites an incident would have to parse prose that this file does not
+write in a fixed shape.
+
+Class: a check with no incident behind it
 
 ## 2026-09-01 — The critic proposed for step 7 was the self-audit this skill rejects
 
@@ -108,6 +246,8 @@ is the artifacts rather than the reasoning. Where no fresh reader is available,
 record that the pass did not run, since a step answered by the author reads as
 done. `scripts/check.sh` asserts that step 7 still names where it runs, and the
 assertion was watched failing against a step 7 with that wording removed.
+
+Class: new — a review run by the same author it is meant to check; no existing label names a control invalidated by sharing the author's context rather than by scope or wiring
 
 ---
 
@@ -146,6 +286,8 @@ rule already exists and is not working. `scripts/check.sh` cannot assert this fo
 other people's checks, so it asserts what it can here: this repo's own new count
 check was written, watched failing against a deleted question, and only then kept.
 
+Class: a wired check that cannot fire
+
 ---
 
 ## 2026-09-01 — A scoped grep became an absolute claim, then an acceptance criterion, then nearly a deletion
@@ -173,6 +315,8 @@ with the command that produced it and not with the sentence it produced. The
 critic pass added at step 7 asks it twice over, once as "which factual claim here
 was not measured" and once as "is anything here destructive, and does its premise
 hold."
+
+Class: a control or a claim whose stated scope is narrower than the hazard it names
 
 ---
 
@@ -208,6 +352,8 @@ by construction. Both of today's late entries came from running or grepping
 rather than reading. Reading this repo finds classes. Only running it finds
 instances.
 
+Class: new — a landed claim never checked against the file it names; no existing label names a claim of completed work that was never checked against the artifact it claims to have changed
+
 ---
 
 ## 2026-08-31 — A documented step vanished during a refactor and nothing noticed
@@ -224,6 +370,8 @@ the file, which is not a gate.
 **The rule.** If a document has a structure other things depend on, assert the
 structure mechanically. `scripts/check.sh` now requires the step headings to be
 exactly 1–7, in order. Prose cannot guard prose.
+
+Class: new — structure guarded only by prose; no existing label names an implicit document structure that broke silently because nothing asserted it mechanically
 
 ---
 
@@ -243,6 +391,8 @@ the trigger surface, because nothing connected the two.
 **The rule.** Whatever the body claims the skill is best at, the description must
 name in the words a user would type. A capability the trigger surface can't reach
 does not exist. Verified behaviourally, not structurally, see `evals/`.
+
+Class: new — a capability its own trigger surface can't reach; no existing label names two artifacts describing the same capability where only the narrower one is load-bearing and neither was checked against the other
 
 ---
 
@@ -264,6 +414,8 @@ inventory *after* answering, where it couldn't prime the response.
 capability and a correct refusal produce identical output, the test measures
 nothing**, go and confirm the capability was present.
 
+Class: new — an absent capability and a correct refusal producing the same output; no existing label names a negative test result that reads as a pass whether or not the capability under test was even present
+
 ---
 
 ## 2026-08-31 — One agent's unreviewed conclusion came back looking like corroboration
@@ -280,6 +432,8 @@ read whatever was in the tree. Nothing said which branch counted as history.
 **The rule.** **Unmerged work is not history.** Sweep the branch that ships;
 anything unmerged is a proposal. Now stated in step 4 and in
 `references/history-sources.md`.
+
+Class: new — unmerged or unreviewed work treated as independent corroboration; no existing label names a second source that turns out to share the first source's own unreviewed origin
 
 ---
 
@@ -299,6 +453,8 @@ first time work runs in parallel.
 consequence collide only when two entries describe the same incident, which is a
 collision worth seeing. Fixed here and in the upstream `craft:lesson` convention
 this skill inherited it from.
+
+Class: new — a convention that assumed a single writer, broken by concurrent ones; no existing label names an unstated single-writer assumption in a shared convention
 
 ---
 
@@ -342,6 +498,8 @@ around them, and it killed nine of its own twelve candidates before reporting.
 Self-review found the classes. It did not find the instances on the page everyone
 reads first.
 
+Class: new — a fact copied instead of computed; no existing label names a fact copied into a second document that then drifts from the source instead of being computed from it
+
 ---
 
 ## 2026-08-31 — Correct install instructions failed because two commands looked like one
@@ -366,3 +524,5 @@ that already failed.
 warning**, and a fence's language tag must match where the command actually runs.
 Where copying a whole block *is* correct (the shell form) put the lines in one
 block and say so. Format is part of the instruction, not decoration around it.
+
+Class: new — correct content lost in the delivery route; no existing label names correct content that fails only in the format or delivery path to the reader

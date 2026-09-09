@@ -50,11 +50,12 @@ run in?** The list is in `checks-that-cannot-fail.md` under the matrix shape.
 
 **Give it read access, or a copy.** Re-running the evidence is the most valuable
 thing this pass does and the most dangerous, because a reader with write access in
-a live tree can destroy the work it was sent to check. `git checkout -- <file>`
-restores from the index, so it silently discards uncommitted changes, and an
-experiment that ends with one has destroyed the artifact it was sent to check. Put it in the
-brief: experiments run on a copy, the tree is left as found, and report
-`git status --porcelain` from before and after.
+a live tree can destroy the work it was sent to check. The rule and the commands
+that break it are in step 1, which states them for whoever is holding the work
+rather than for this reader alone. Scoping them here was itself an incident: the
+author ran one of those commands on the live tree the day after writing this
+paragraph, and the warning did not address them. Put step 1's rule in the brief,
+and ask for `git status --porcelain` from before and after.
 
 The output is a short list or nothing. A critic that always finds something is
 one nobody reads.

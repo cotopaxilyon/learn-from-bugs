@@ -2,7 +2,7 @@
 // PreToolUse gate on the incident log. A new entry lands only with the trailing
 // block SKILL.md step 6 specifies, and the block's claims are checked against the
 // log, the git history, and the repo itself rather than read as prose. What it
-// binds: the label set, the prior dates, the git-nominated priors, the instance
+// binds: the label set, the prior entries, the git-nominated priors, the instance
 // arithmetic, the mechanism numbers, and that every Sweep command runs and its
 // observation matches the output. What it cannot bind: whether a disposition or
 // a level is right, which is the critic's question. Cooperative backstop: a
@@ -46,7 +46,21 @@ function headingsIn(text) {
   return out;
 }
 
-function entriesIn(text) {
+// A prior row names one entry, not one day. Seven entries in this project's own
+// log share 2026-08-31 and three share 2026-09-01, so a row keyed by date said
+// "one of these seven" and the gate scored it as a match on all of them. The key
+// is the date plus a substring of that entry's heading title, and it has to
+// resolve to exactly one entry or the row is refused.
+function entryKey(h) { return `${h.date} ${h.title}`; }
+
+export function resolvePrior(date, slug, headings) {
+  const onDay = headings.filter((h) => h.date === date);
+  const needle = String(slug ?? '').trim().toLowerCase();
+  if (!needle) return { matches: [], onDay };
+  return { matches: onDay.filter((h) => h.title.toLowerCase().includes(needle)), onDay };
+}
+
+export function entriesIn(text) {
   const lines = text.split('\n');
   const starts = [];
   lines.forEach((l, i) => { if (HEADING.test(l)) starts.push(i); });
@@ -57,11 +71,24 @@ function entriesIn(text) {
   });
 }
 
+// The label a Class: line carries, minted or reused: the `new —` prefix stripped
+// and the reason after the first `;` dropped. Both sides of the reuse check
+// normalize through here, so what a mint registers is what a later entry types.
+export function labelOf(value) {
+  const stripped = value.replace(new RegExp(`^new\\s*${DASH}\\s*`, 'i'), '');
+  return stripped.split(';')[0].trim().toLowerCase();
+}
+
+// Minted labels join the set. They did not, so the set could only ever grow from
+// a bare label, which the gate refuses unless it is already in the set: the label
+// reuse the backward sweep depends on was unreachable by construction, and every
+// entry could only mint again. Found on 2026-09-04 by writing an entry that
+// wanted the label the 2026-09-03 entry had minted.
 function classLabelsIn(text) {
   const set = new Set();
   for (const m of text.matchAll(/^Class:[ \t]*(.+?)\s*$/gm)) {
-    const v = m[1].trim();
-    if (!/^new\s*[—–-]/i.test(v)) set.add(v.toLowerCase());
+    const label = labelOf(m[1].trim());
+    if (label) set.add(label);
   }
   return set;
 }
@@ -100,18 +127,28 @@ export function touchedFiles({ cwd, logPath }) {
   } catch { return []; }
 }
 
-export function nominate({ cwd, logPath, logDates }) {
+// Nominations are entries too. Keyed by date, a nomination against a day
+// carrying seven entries asked for one row, took a verdict on whichever one the
+// author picked, and left six unread with the gate green: a precise row against
+// an imprecise nomination is a check that cannot fail. Every entry on a
+// nominated day is nominated.
+export function nominate({ cwd, logPath, headings }) {
   const git = (args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const files = touchedFiles({ cwd, logPath });
-  const dates = new Set();
+  const byDate = new Map();
+  for (const h of headings) {
+    if (!byDate.has(h.date)) byDate.set(h.date, []);
+    byDate.get(h.date).push(h);
+  }
+  const out = new Map();
   for (const f of files) {
     try {
       for (const d of git(['log', '--date=short', '--format=%ad', '--', f]).split('\n')) {
-        if (d && logDates.has(d)) dates.add(d);
+        if (d && byDate.has(d)) for (const h of byDate.get(d)) out.set(entryKey(h), h);
       }
     } catch { /* untracked, nothing to nominate from */ }
   }
-  return [...dates].sort();
+  return [...out.values()].sort((a, b) => entryKey(a).localeCompare(entryKey(b)));
 }
 
 // Split on shell metacharacters that sit outside quotes. A `|` inside a quoted
@@ -215,8 +252,16 @@ export function validateEntry(entry, { onDisk, nominated, cwd }) {
   if (cls) {
     const known = classLabelsIn(onDisk);
     const isNew = new RegExp(`^new\\s*${DASH}\\s*\\S`, 'i').test(cls);
-    if (!isNew && !known.has(cls.toLowerCase())) {
-      fails.push({ code: 'deny_class_unknown', detail: `"${cls}" matches no Class: in the log; reuse one, or write "Class: new — <why no existing label fits>"` });
+    if (!isNew && !known.has(labelOf(cls))) {
+      fails.push({ code: 'deny_class_unknown', detail: `"${cls}" matches no Class: in the log; reuse one, or write "Class: new — <label>; <why no existing label fits>"` });
+    }
+    // A mint that is only a reason registers that reason as the label, and the
+    // next instance cannot reuse a sentence written about this one. The empty
+    // label is checked too, not just the separator: `new — ; <reason>` carries a
+    // `;`, so a separator-only check passed it and it still registered nothing,
+    // which is the defect this refusal exists to close.
+    if (isNew && (!cls.includes(';') || !labelOf(cls))) {
+      fails.push({ code: 'deny_class_mint_shape', detail: `Class: new — needs "<label>; <why no existing label fits>", with a non-empty label, so it is separable from the reason and a later entry can reuse it; got "${cls.slice(0, 60)}"` });
     }
   }
 
@@ -262,21 +307,61 @@ export function validateEntry(entry, { onDisk, nominated, cwd }) {
       else if (cwd && !runCommand(parsed.cmd, cwd).ok) fails.push({ code: 'deny_sweep_command_failed', detail: `\`${parsed.cmd}\` did not run cleanly here` });
     }
   }
-  const rows = [...body.matchAll(/^- (\d{4}-\d{2}-\d{2}):[ \t]*([a-z-]+)\s*$/gm)].map((m) => ({ date: m[1], disp: m[2] }));
-  const logDates = new Set(headingsIn(onDisk).map((h) => h.date));
+  // The last colon splits the key from the disposition, so a heading substring
+  // may itself carry one. The slug group is optional in the pattern only so the
+  // bare-date form is caught and named rather than silently unparsed.
+  const rows = [...body.matchAll(/^- (\d{4}-\d{2}-\d{2})(?:[ \t]+(.*))?:[ \t]*([a-z-]+)\s*$/gm)]
+    .map((m) => ({ date: m[1], slug: (m[2] ?? '').trim(), disp: m[3], raw: m[0].trim() }));
+  const headings = headingsIn(onDisk);
+  const dispositioned = new Map();
+  const titlesOn = (onDay) => onDay.map((h) => `"${h.title}"`).join('; ');
   for (const r of rows) {
     if (!DISPOSITIONS.includes(r.disp)) fails.push({ code: 'deny_prior_disposition', detail: `${r.date}: "${r.disp}" is not one of ${DISPOSITIONS.join(' | ')}` });
-    if (!logDates.has(r.date)) fails.push({ code: 'deny_prior_not_in_log', detail: `${r.date} is not the date of any entry in the log` });
+    const { matches, onDay } = resolvePrior(r.date, r.slug, headings);
+    if (onDay.length === 0) {
+      fails.push({ code: 'deny_prior_not_in_log', detail: `${r.date} is not the date of any entry in the log` });
+    } else if (!r.slug) {
+      fails.push({ code: 'deny_prior_no_slug', detail: `"${r.raw}" names a day, not an entry. Add words from the heading: "- ${r.date} <words> : ${r.disp}". On ${r.date}: ${titlesOn(onDay)}` });
+    } else if (matches.length === 0) {
+      fails.push({ code: 'deny_prior_not_in_log', detail: `no entry on ${r.date} has "${r.slug}" in its heading. On ${r.date}: ${titlesOn(onDay)}` });
+    } else if (matches.length > 1) {
+      const identical = matches.every((h) => h.title === matches[0].title);
+      fails.push(identical
+        ? { code: 'deny_prior_ambiguous', detail: `${matches.length} entries on ${r.date} carry the identical heading "${matches[0].title}", so no row can separate them. The row is not the defect; the log is. Retitle one of them.` }
+        : { code: 'deny_prior_ambiguous', detail: `"${r.slug}" matches ${matches.length} entries on ${r.date}, so the row does not say which was read: ${titlesOn(matches)}` });
+    } else if (dispositioned.has(entryKey(matches[0]))) {
+      // Two rows resolving to one entry read as two priors. Under the day-keyed
+      // grammar three identical rows counted three, and the entry-keyed grammar
+      // inherited it: the instance number is over entries, not lines.
+      fails.push({ code: 'deny_prior_duplicate', detail: `two rows dispose of the same entry, "${matches[0].title}" (${r.date}); one row per prior` });
+    } else {
+      dispositioned.set(entryKey(matches[0]), r.disp);
+    }
   }
-  const rowDates = new Set(rows.map((r) => r.date));
-  for (const d of nominated) {
-    if (!rowDates.has(d)) fails.push({ code: 'deny_prior_not_dispositioned', detail: `git nominates ${d} (a commit on a file this fix touches shares its day with a log entry); add "- ${d}: same-theme | adjacent | unrelated"` });
+  const bodyLines = body.split('\n');
+  {
+    const wellFormed = new Set(rows.map((r) => r.raw));
+    for (let i = 0; i < bodyLines.length; i += 1) {
+      const line = bodyLines[i].trim();
+      // Any bullet marker and any date-shaped opening. Requiring a correctly
+      // formatted date first meant a mistyped one, the commonest way to write a
+      // line that looks like a row and is not one, was never called a row at all.
+      // Read body-wide, the same span the strict pattern reads, because a broken
+      // row outside the block window was dropped while its well-formed twin in
+      // the same position was honoured.
+      if (!/^[-*\u2013\u2014\u2022]\s*\d{4}\D\d{1,2}\D\d{1,2}\b/.test(line)) continue;
+      if (wellFormed.has(line)) continue;
+      fails.push({ code: 'deny_prior_malformed', detail: `"${line}" sits among the prior rows and is not one. A row is "- <YYYY-MM-DD> <words from that entry's heading>: ${DISPOSITIONS.join(' | ')}", one space after the dash and the disposition in lower case. Dropped silently before 2026-09-09, taking its claimed prior with it.` });
+    }
+  }
+  for (const e of nominated) {
+    if (!dispositioned.has(entryKey(e))) fails.push({ code: 'deny_prior_not_dispositioned', detail: `git nominates "${e.title}" (${e.date}), a commit on a file this fix touches sharing its day; add "- ${e.date} <words from that heading>: same-theme | adjacent | unrelated"` });
   }
 
   const inst = need('Instance');
   if (inst !== null) {
     const n = Number(inst);
-    const same = rows.filter((r) => r.disp === 'same-theme').length;
+    const same = [...dispositioned.values()].filter((d) => d === 'same-theme').length;
     if (!Number.isInteger(n) || n < 1) fails.push({ code: 'deny_instance_count', detail: 'Instance: must be an integer ≥ 1' });
     else if (n !== same + 1) fails.push({ code: 'deny_instance_count', detail: `Instance: ${n} but ${same} prior(s) are dispositioned same-theme, so it is ${same + 1}` });
   }
@@ -327,8 +412,7 @@ export function decide(input, env = process.env) {
   const onDisk = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : '';
   const entries = newEntries({ toolName, toolInput, onDisk });
   if (entries.length === 0) return null;
-  const logDates = new Set(headingsIn(onDisk).map((h) => h.date));
-  const nominated = nominate({ cwd, logPath, logDates });
+  const nominated = nominate({ cwd, logPath, headings: headingsIn(onDisk) });
   const fails = [];
   for (const e of entries) {
     for (const f of validateEntry(e, { onDisk, nominated, cwd })) fails.push({ entry: e.date, ...f });

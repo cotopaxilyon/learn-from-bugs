@@ -39,13 +39,17 @@ Bucket: unrecorded
 Not one up: process would mean a phase or a role, and this convention is owned by one test file, so the fix is the file
 Sweep: \`grep -rn "fmtDayKey" src/\` → 1 call site, src/dates.js
 Priors: \`git log --date=short --format=%ad -- src/dates.js\` → 3 nominated
-- 2026-06-11: same-theme
-- 2026-04-02: same-theme
-- 2026-02-09: same-theme
+- 2026-06-11 malformed timestamp: same-theme
+- 2026-04-02 CSV export: same-theme
+- 2026-02-09 activity heading: same-theme
 Landed: 2 round-trip test at the calendar boundary, red: fails on 2026-02-30 before the fix
 Landed: 3 test/dates.test.js header names the convention
 Critic: ran
 `;
+
+const headingsOf = (text) => [...text.matchAll(/^## (\d{4}-\d{2}-\d{2})\s*[\u2014\u2013-]\s*(.+)$/gm)]
+  .map((m) => ({ date: m[1], title: m[2].trim() }));
+const nomDates = (args) => nominate(args).map((e) => e.date);
 
 function codes(out) {
   if (!out) return [];
@@ -118,8 +122,58 @@ test('an unknown label is denied; a reused one and a justified new one pass', ()
   const w = (cls) => v(null, GOOD.replace(/^Class:.*$/m, `Class: ${cls}`));
   assert.ok(w('date handling').includes('deny_class_unknown'));
   assert.ok(!w('Null Safety').includes('deny_class_unknown'));
-  assert.ok(!w('new — nothing in the log covers it').includes('deny_class_unknown'));
+  // A well-formed mint, since a reason-only one is now refused by mint shape and
+  // this test's name would otherwise describe an entry the gate denies.
+  assert.ok(!w('new — an unreachable label set; nothing in the log covers it').includes('deny_class_unknown'));
   assert.ok(w('new —').includes('deny_class_unknown'));
+});
+
+// The reuse the backward sweep depends on. classLabelsIn dropped every minted
+// line, so the set could only grow from a bare label, which the gate refuses
+// unless it is already in the set: unreachable by construction.
+//
+// This runs the trip rather than seeding one end of it: the minting entry is put
+// through validateEntry and only appended to the log once the gate has accepted
+// it, so a mint the gate would refuse cannot supply the label the reuse then
+// reads. Seeding the mint by hand was the first version of this test, and it
+// could not see that `new — ; <reason>` is accepted and registers nothing.
+function mintThenReuse(mintCls, reuseCls) {
+  const minting = GOOD.replace(/^Class:.*$/m, `Class: ${mintCls}`);
+  const mintCodes = validateEntry({ date: 'd', title: 't', body: minting }, { onDisk: LOG, nominated: [], cwd: null }).map((f) => f.code);
+  if (mintCodes.length) return { mintCodes, reuseCodes: null };
+  const log = `${LOG}\n## 2026-08-31 — The minting entry\n\n${minting}`;
+  const reuseCodes = validateEntry(
+    { date: 'd', title: 't', body: GOOD.replace(/^Class:.*$/m, `Class: ${reuseCls}`) },
+    { onDisk: log, nominated: [], cwd: null },
+  ).map((f) => f.code);
+  return { mintCodes, reuseCodes };
+}
+
+test('a label minted through the gate joins the set, so the next entry reuses it bare', () => {
+  const label = 'a wired check that cannot fire';
+  const mint = `new — ${label}; no label in the log covers a check that is green because it is unreachable`;
+  const ok = mintThenReuse(mint, label);
+  assert.deepEqual(ok.mintCodes, [], 'the minting entry must itself pass');
+  assert.ok(!ok.reuseCodes.includes('deny_class_unknown'));
+  assert.ok(!mintThenReuse(mint, 'A Wired Check That Cannot Fire').reuseCodes.includes('deny_class_unknown'));
+  assert.ok(mintThenReuse(mint, 'a wired check that never fires').reuseCodes.includes('deny_class_unknown'));
+});
+
+// The trip, run against the case a separator-only check let through: the mint is
+// accepted, registers nothing, and the reuse is refused for a label the log
+// appears to hold. Refusing it at the mint is what keeps the two ends agreeing.
+test('a mint the gate accepts always supplies a label the next entry can reuse', () => {
+  const r = mintThenReuse('new — ; nothing in the log covers it', 'nothing in the log covers it');
+  assert.ok(r.mintCodes.includes('deny_class_mint_shape'), 'an empty label must be refused at the mint');
+});
+
+test('minting names a non-empty label before the reason, so there is something to reuse', () => {
+  const w = (cls) => v(null, GOOD.replace(/^Class:.*$/m, `Class: ${cls}`));
+  assert.ok(w('new — nothing in the log covers it').includes('deny_class_mint_shape'));
+  // Carries the separator and no label: passed the first version of this check
+  // and registered nothing, which is the whole defect.
+  assert.ok(w('new — ; nothing in the log covers it').includes('deny_class_mint_shape'));
+  assert.ok(!w('new — an unreachable label set; nothing in the log covers it').includes('deny_class_mint_shape'));
 });
 
 test('bucket is closed-set and required', () => {
@@ -147,12 +201,159 @@ test('instance count must equal same-theme priors plus one', () => {
 });
 
 test('a prior not in the log, or with an unknown disposition, is denied', () => {
-  assert.ok(v(null, GOOD.replace('- 2026-02-09: same-theme', '- 2026-02-10: same-theme')).includes('deny_prior_not_in_log'));
-  assert.ok(v(null, GOOD.replace('- 2026-02-09: same-theme', '- 2026-02-09: related').replace('Instance: 4', 'Instance: 3')).includes('deny_prior_disposition'));
+  assert.ok(v(null, GOOD.replace('- 2026-02-09 activity heading:', '- 2026-02-10 activity heading:')).includes('deny_prior_not_in_log'));
+  assert.ok(v(null, GOOD.replace('- 2026-02-09 activity heading: same-theme', '- 2026-02-09 activity heading: related').replace('Instance: 4', 'Instance: 3')).includes('deny_prior_disposition'));
 });
 
 test('a git-nominated prior the entry does not dispose of is denied', () => {
-  assert.ok(v(null, GOOD.replace('- 2026-04-02: same-theme\n', '').replace('Instance: 4', 'Instance: 3'), ['2026-04-02']).includes('deny_prior_not_dispositioned'));
+  const csv = { date: '2026-04-02', title: 'The CSV export returned a 500 for one feed' };
+  assert.ok(v(null, GOOD.replace('- 2026-04-02 CSV export: same-theme\n', '').replace('Instance: 4', 'Instance: 3'), [csv]).includes('deny_prior_not_dispositioned'));
+});
+
+// Three of this project's own log days carry more than one entry and one carries
+// seven, so these run against a log shaped like the real one rather than the
+// one-entry-per-day fixture above.
+const DUPE_LOG = `# Lessons
+
+## 2026-04-02 — The CSV export returned a 500 for one feed
+
+Body. Class: type coercion at a boundary.
+
+## 2026-04-02 — The activity heading read "Activity for null"
+
+Body. Class: null safety
+
+## 2026-04-02 — A malformed timestamp put rows under a bucket headed "undefined"
+
+Body. Class: input validation.
+`;
+const DUPE_HEADINGS = headingsOf(DUPE_LOG);
+const withRows = (rows, instance) => GOOD
+  .replace(/^- 2026.*\n/gm, '')
+  .replace(/^(Priors:.*\n)/m, `$1${rows}`)
+  .replace('Instance: 4', `Instance: ${instance}`);
+const dupeFails = (rows, instance, nominated = []) => validateEntry(
+  { date: 'd', title: 't', body: withRows(rows, instance) },
+  { onDisk: DUPE_LOG, nominated, cwd: null },
+);
+const dupeCodes = (rows, instance, nominated = []) => dupeFails(rows, instance, nominated).map((f) => f.code);
+
+test('a prior row naming only a day is refused, and the deny names the entries on it', () => {
+  // The row that started this: "- 2026-04-02: same-theme" against three entries
+  // on 2026-04-02 said "one of these three" and was scored as a match.
+  const fails = dupeFails('- 2026-04-02: same-theme\n', 2);
+  assert.ok(fails.map((f) => f.code).includes('deny_prior_no_slug'), JSON.stringify(fails));
+  const detail = fails.find((f) => f.code === 'deny_prior_no_slug').detail;
+  for (const t of ['CSV export', 'Activity for null', 'malformed timestamp']) {
+    assert.ok(detail.includes(t), `deny text should name "${t}": ${detail}`);
+  }
+});
+
+test('a slug matching more than one entry on its day is refused', () => {
+  assert.ok(dupeCodes('- 2026-04-02 the: same-theme\n', 2).includes('deny_prior_ambiguous'));
+  assert.ok(!dupeCodes('- 2026-04-02 CSV export: same-theme\n', 2).includes('deny_prior_ambiguous'));
+});
+
+test('a slug matching no entry on its day is refused as not in the log', () => {
+  assert.ok(dupeCodes('- 2026-04-02 timezone offset: same-theme\n', 2).includes('deny_prior_not_in_log'));
+});
+
+test('every entry on a nominated day must be dispositioned, not just one of them', () => {
+  // A precise row against a day-keyed nomination was a check that could not
+  // fail: one verdict closed out all three entries sharing the day.
+  const one = dupeCodes('- 2026-04-02 CSV export: same-theme\n', 2, DUPE_HEADINGS)
+    .filter((c) => c === 'deny_prior_not_dispositioned');
+  assert.equal(one.length, 2);
+  const all = dupeCodes(
+    '- 2026-04-02 CSV export: same-theme\n- 2026-04-02 Activity for null: adjacent\n- 2026-04-02 malformed timestamp: unrelated\n',
+    2,
+    DUPE_HEADINGS,
+  ).filter((c) => c === 'deny_prior_not_dispositioned');
+  assert.equal(all.length, 0);
+});
+
+test('same-day priors each count toward the instance number, and only once each', () => {
+  // Instance is over entries, not lines. Day-keyed, three identical rows were
+  // three same-theme priors naming one entry, and the entry-keyed grammar
+  // inherited that until a row resolving to an already-disposed entry was
+  // refused. The first assertion is the one that was green on both.
+  const rows = '- 2026-04-02 CSV export: same-theme\n- 2026-04-02 Activity for null: same-theme\n- 2026-04-02 malformed timestamp: unrelated\n';
+  assert.ok(dupeCodes(rows, 2).includes('deny_instance_count'));
+  assert.ok(!dupeCodes(rows, 3).includes('deny_instance_count'));
+  const doubled = '- 2026-04-02 CSV export: same-theme\n- 2026-04-02 CSV export: same-theme\n';
+  assert.ok(dupeCodes(doubled, 3).includes('deny_prior_duplicate'));
+  // and the second row does not buy an instance
+  assert.ok(dupeCodes(doubled, 3).includes('deny_instance_count'));
+  assert.ok(!dupeCodes('- 2026-04-02 CSV export: same-theme\n', 2).includes('deny_instance_count'));
+});
+
+test('a row that looks like a prior row and is not one is refused, not dropped', () => {
+  // Before 2026-09-09 the strict pattern collected these and nothing else did,
+  // so the line vanished and took its claimed prior with it. The entry landed
+  // with an Instance the author believed and the gate had never counted.
+  // The first version of this detector required a well-formed date before it
+  // would call a line a row, so a mistyped date, the commonest way to write a
+  // line that looks like a row and is not one, was never examined. It also read
+  // only the Priors-to-Landed window while the strict pattern read the whole
+  // body, so a broken row outside that window was dropped and its well-formed
+  // twin in the same position was honoured. Both halves are covered here.
+  const malformed = [
+    '- 2026-04-02 CSV export: Same-Theme',
+    '- 2026-04-02 CSV export: same-theme2',
+    '  - 2026-04-02 CSV export: same-theme',
+    '-  2026-04-02 CSV export: same-theme',
+    '-2026-04-02 CSV export: same-theme',
+    '* 2026-04-02 CSV export: Same-Theme',
+    '\u2013 2026-04-02 CSV export: same-theme',
+    '- 2026-4-02 CSV export: same-theme',
+    '- 2026/04/02 CSV export: same-theme',
+  ];
+  for (const row of malformed) {
+    assert.ok(dupeCodes(row + '\n', 1).includes('deny_prior_malformed'), `not refused: ${row}`);
+  }
+  // and a well-formed row is not swept up by the same scan
+  assert.ok(!dupeCodes('- 2026-04-02 CSV export: same-theme\n', 2).includes('deny_prior_malformed'));
+});
+
+test('a malformed row no longer deflates the instance number in silence', () => {
+  // The pair that made this findable: the same row spelled two ways was
+  // ALLOWED both times, once at Instance 1 and once at Instance 2.
+  const bad = dupeCodes('- 2026-04-02 CSV export: Same-Theme\n', 1);
+  assert.ok(bad.includes('deny_prior_malformed'));
+  assert.ok(!dupeCodes('- 2026-04-02 CSV export: same-theme\n', 2).includes('deny_prior_malformed'));
+});
+
+test('a malformed row is refused wherever it sits, not only inside the block window', () => {
+  const bad = '- 2026-04-02 CSV export: Same-Theme';
+  const withRows = (rows) => GOOD.replace(/^- 2026.*\n/gm, '').replace(/^(Priors:.*\n)/m, `$1${rows}`).replace('Instance: 4', 'Instance: 2');
+  const inWindow = withRows('- 2026-04-02 CSV export: same-theme\n' + bad + '\n');
+  const above = withRows('- 2026-04-02 CSV export: same-theme\n').replace(/^(Priors:)/m, bad + '\n$1');
+  const below = withRows('- 2026-04-02 CSV export: same-theme\n').replace(/^(Critic:)/m, bad + '\n$1');
+  for (const [name, b] of [['in', inWindow], ['above Priors:', above], ['after Landed:', below]]) {
+    const codes = validateEntry({ date: 'd', title: 't', body: b }, { onDisk: DUPE_LOG, nominated: [], cwd: null }).map((f) => f.code);
+    assert.ok(codes.includes('deny_prior_malformed'), `${name}: ${codes.join(',')}`);
+  }
+});
+
+test('two entries with the identical heading name the log, not the row', () => {
+  // No slug separates them, so telling the author to write a better row is
+  // advice they cannot follow. The deny says which artifact is wrong.
+  const twins = `# Lessons
+
+## 2026-05-05 — A repeated title
+
+Body. Class: null safety
+
+## 2026-05-05 — A repeated title
+
+Body. Class: null safety
+`;
+  const body = withRows('- 2026-05-05 A repeated title: same-theme\n', 2);
+  const fails = validateEntry({ date: 'd', title: 't', body }, { onDisk: twins, nominated: [], cwd: null });
+  const amb = fails.find((f) => f.code === 'deny_prior_ambiguous');
+  assert.ok(amb, JSON.stringify(fails.map((f) => f.code)));
+  assert.match(amb.detail, /identical heading/);
+  assert.match(amb.detail, /the log/);
 });
 
 test('sweep and priors lines must be `command` → observation', () => {
@@ -233,33 +434,30 @@ test('critic is ran | not-run', () => {
 });
 
 test('git nominates log dates sharing a day with commits on touched files, and only those', () => {
-  const logDates = new Set(['2026-06-11', '2026-04-02', '2026-02-09']);
+  const headings = headingsOf(LOG);
   const dir = repo({ touch: ['src/dates.js'], backdate: { 'src/dates.js': ['2026-02-09', '2026-04-02', '2026-06-11'], 'src/other.js': ['2026-02-09'] } });
-  assert.deepEqual(nominate({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), logDates }), ['2026-02-09', '2026-04-02', '2026-06-11']);
+  assert.deepEqual(nomDates({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), headings }), ['2026-02-09', '2026-04-02', '2026-06-11']);
   const dir2 = repo({ touch: ['src/other.js'], backdate: { 'src/dates.js': ['2026-04-02'], 'src/other.js': ['2026-02-09'] } });
-  assert.deepEqual(nominate({ cwd: dir2, logPath: path.join(dir2, 'docs/LESSONS.md'), logDates }), ['2026-02-09']);
+  assert.deepEqual(nomDates({ cwd: dir2, logPath: path.join(dir2, 'docs/LESSONS.md'), headings }), ['2026-02-09']);
 });
 
 test('committing the fix before writing the entry still nominates it', () => {
-  const logDates = new Set(['2026-06-11', '2026-04-02', '2026-02-09']);
   const dir = repo({ touch: ['src/dates.js'], backdate: { 'src/dates.js': ['2026-04-02'] }, commitTouched: true });
-  assert.deepEqual(nominate({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), logDates }), ['2026-04-02']);
+  assert.deepEqual(nomDates({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), headings: headingsOf(LOG) }), ['2026-04-02']);
 });
 
 test('a dirty tree is the fix; HEAD contributes nothing to it', () => {
   // The union rule dragged in every file of an unrelated HEAD commit. Here
   // HEAD touches src/other.js, whose history carries a log-heading date, and
   // the fix is src/dates.js. Only the fix's dates may be nominated.
-  const logDates = new Set(['2026-06-11', '2026-04-02', '2026-02-09']);
   const dir = repo({ backdate: { 'src/other.js': ['2026-02-09'], 'src/dates.js': ['2026-04-02'] }, touch: ['src/dates.js'] });
   assert.deepEqual(touchedFiles({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md') }), ['src/dates.js']);
-  assert.deepEqual(nominate({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), logDates }), ['2026-04-02']);
+  assert.deepEqual(nomDates({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), headings: headingsOf(LOG) }), ['2026-04-02']);
 });
 
 test('with only the log dirty, the set is every file changed since the log was last committed', () => {
   // The shape that broke the earlier clean-tree wording: fix A, commit, write
   // entry A, fix B, commit B, and the log is still uncommitted. B must nominate.
-  const logDates = new Set(['2026-06-11', '2026-04-02', '2026-02-09']);
   const dir = repo({ backdate: { 'src/dates.js': ['2026-04-02'], 'src/other.js': ['2026-02-09'] } });
   const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_AUTHOR_DATE: '2026-09-03T12:00:00Z', GIT_COMMITTER_DATE: '2026-09-03T12:00:00Z' } });
   fs.appendFileSync(path.join(dir, 'docs/LESSONS.md'), '\n<!-- entry A -->\n');
@@ -274,7 +472,7 @@ test('with only the log dirty, the set is every file changed since the log was l
   const logPath = path.join(dir, 'docs/LESSONS.md');
   // Both commits of the multi-commit fix are in the set, not just HEAD's.
   assert.deepEqual(touchedFiles({ cwd: dir, logPath }).sort(), ['src/dates.js', 'src/other.js']);
-  assert.deepEqual(nominate({ cwd: dir, logPath, logDates }), ['2026-02-09', '2026-04-02']);
+  assert.deepEqual(nomDates({ cwd: dir, logPath, headings: headingsOf(LOG) }), ['2026-02-09', '2026-04-02']);
 });
 
 test('with a log that has never been committed, the set is the HEAD commit', () => {
@@ -290,11 +488,10 @@ test('the since-log window is as wide as the log is stale, and that is the point
   // backward sweep should be asked about. A repo that logs every fix has a
   // one-commit window; a repo that does not has a wide one, and the width is
   // the finding.
-  const logDates = new Set(['2026-06-11', '2026-04-02', '2026-02-09']);
   const dir = repo({ backdate: { 'src/dates.js': ['2026-04-02'], 'src/other.js': ['2026-02-09'] } });
   const logPath = path.join(dir, 'docs/LESSONS.md');
   assert.deepEqual(touchedFiles({ cwd: dir, logPath }).sort(), ['src/dates.js', 'src/other.js']);
-  assert.deepEqual(nominate({ cwd: dir, logPath, logDates }), ['2026-02-09', '2026-04-02']);
+  assert.deepEqual(nomDates({ cwd: dir, logPath, headings: headingsOf(LOG) }), ['2026-02-09', '2026-04-02']);
 });
 
 test('a commit late in a forward zone keeps its own day', () => {
@@ -316,7 +513,7 @@ test('a commit late in a forward zone keeps its own day', () => {
   git('commit', '-q', '-m', 'late');
   fs.appendFileSync(path.join(dir, 'src.js'), 'touch\n');
   assert.deepEqual(
-    nominate({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), logDates: new Set(['2026-09-04']) }),
+    nomDates({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md'), headings: [{ date: '2026-09-04', title: 'Late in a forward zone' }] }),
     ['2026-09-04'],
   );
 });
@@ -332,7 +529,7 @@ test('nothing changed since the log was committed nominates nothing', () => {
 
 test('end to end: an entry that ignores a nominated prior is denied through decide()', () => {
   const dir = repo({ touch: ['src/dates.js'], backdate: { 'src/dates.js': ['2026-04-02'] } });
-  const entry = GOOD.replace('- 2026-04-02: same-theme\n', '').replace('Instance: 4', 'Instance: 3');
+  const entry = GOOD.replace('- 2026-04-02 CSV export: same-theme\n', '').replace('Instance: 4', 'Instance: 3');
   const out = decide({ tool_name: 'Edit', cwd: dir, tool_input: { file_path: path.join(dir, 'docs/LESSONS.md'), old_string: '# Lessons\n', new_string: '# Lessons\n\n' + entry } });
   assert.ok(codes(out).includes('deny_prior_not_dispositioned'), JSON.stringify(out));
   assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');

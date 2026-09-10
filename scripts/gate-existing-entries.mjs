@@ -67,7 +67,7 @@ function excused(heading, code) {
 // absent, because every entry carries one and it predates the block. The theme
 // block's three fields were missing here, so an entry carrying a part-written
 // theme block kept an excuse that says the block postdates it.
-const BLOCK_FIELDS = ['Instance', 'Level', 'Bucket', 'Not one up', 'Sweep', 'Priors', 'Landed', 'Critic', 'Theme', 'Window', 'Count'];
+export const BLOCK_FIELDS = ['Instance', 'Level', 'Bucket', 'Not one up', 'Sweep', 'Priors', 'Landed', 'Critic', 'Theme', 'Window', 'Count'];
 
 function carriesBlockField(body) {
   return BLOCK_FIELDS.some((f) => new RegExp(`^${f}:`, 'm').test(body));

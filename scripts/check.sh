@@ -15,6 +15,17 @@ REF_BUDGET=200
 # each source the ecosystem adds. A uniform cap across files with different jobs was the wrong shape; this
 # is a stated exception, not a cap raised on contact. Everything else stays at 200.
 REF_BUDGET_history_sources=220
+# examples.md carries the worked output rather than describing it, so every one
+# of its five sections ends in a step 6 block and the theme example carries a
+# second kind. Six blocks are about 80 lines that cannot be paraphrased: a block
+# is the shape, and a shortened one is a different shape. Considered for removal
+# before the cap moved: the log-entry blockquotes (kept, they are the entry the
+# block belongs to), the second illustrative sketch in example 5 (kept, it is the
+# only worked shape for the misunderstood bucket), and the "Reading the blocks"
+# preamble (cut by half, not dropped, because a row that resolves in no log is
+# the first thing a reader copies wrong). 200 was the cap when the file carried
+# no blocks at all.
+REF_BUDGET_examples=300
 fails=0
 
 fail() { printf '  ✗ %s\n' "$1"; fails=$((fails + 1)); }
@@ -315,6 +326,19 @@ else
   fail "$(node scripts/gate-existing-entries.mjs 2>&1 | head -1)"
 fi
 
+echo "== the worked examples satisfy the gate that guards the log =="
+# The examples are prose in a reference, so the gate never runs against them, and
+# a reference showing a shape the gate refuses teaches the wrong thing with
+# nothing to catch it. Sibling of the audit above: same validator, same static
+# scope. Greps were the alternative and were rejected, because an assertion that
+# greps a region leaks the moment the region moves and it restates closed sets
+# the gate already exports. Every arm is seen red in scripts/check-examples.test.mjs.
+if node scripts/check-examples.mjs >/dev/null 2>&1; then
+  pass "every block in examples.md satisfies the grammar the gate enforces today"
+else
+  fail "$(node scripts/check-examples.mjs 2>&1 | head -1)"
+fi
+
 echo "== published files never cite a maintainer note =="
 # Plans, proposals and handoffs live in docs/internal/, which is gitignored so
 # clients do not see them. A published file citing one points at a path that
@@ -346,6 +370,7 @@ for f in "$REFS"/*.md; do
   n="$(grep -c "" "$f")"
   case "$(basename "$f")" in
     history-sources.md) budget="$REF_BUDGET_history_sources" ;;
+    examples.md) budget="$REF_BUDGET_examples" ;;
     *) budget="$REF_BUDGET" ;;
   esac
   if [ "$n" -le "$budget" ]; then pass "$(basename "$f") $n/$budget lines"
@@ -358,9 +383,9 @@ echo "== the unit suites run =="
 # executes is a check that cannot fail, which is the 2026-09-01 entry. The suites
 # are wired here so CI runs them.
 if command -v node >/dev/null 2>&1; then
-  if node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs >/dev/null 2>&1
-  then pass "ledger-gate and gate-existing-entries suites"
-  else fail "unit suites failed; run: node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs"; fi
+  if node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs >/dev/null 2>&1
+  then pass "ledger-gate, gate-existing-entries and check-examples suites"
+  else fail "unit suites failed; run: node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs"; fi
 else
   fail "node is not on PATH, so the unit suites did not run"
 fi

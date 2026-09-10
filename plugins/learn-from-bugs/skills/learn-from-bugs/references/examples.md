@@ -1,7 +1,9 @@
 # Worked examples
 
 Companion to `SKILL.md`. Five issues run end to end, so the shape of the output is
-visible rather than described, this is also the format steps 6 and 8 ask for.
+visible rather than described, this is also the format steps 6 and 8 ask for. Each
+one ends the way a real entry ends: the prose for a reader, then the fixed-shape
+block for the gate and for the next run of this procedure.
 
 Examples 1 to 4 are real. Three come from a production web app we build and
 maintain ourselves, and the fourth from this skill's own development. They are our
@@ -12,6 +14,31 @@ because the point is the shape of the analysis rather than the product.
 **Example 5 is illustrative**, and labeled as such because no real instance of the
 unread or misunderstood buckets had come up yet. Inventing history and presenting it as real is
 the failure this skill exists to prevent.
+
+---
+
+## Reading the blocks
+
+Every block below is in the grammar `hooks/ledger-gate.mjs` enforces today, and
+`scripts/check.sh` runs the gate's own validator over each one, so a reference
+here cannot show a shape the shipped gate refuses.
+
+A prior row and a member row name an entry rather than a day, so they resolve
+only inside one log. Examples 1 to 3 sit in the product's log, listed below;
+example 4 sits in this repo's own `docs/LESSONS.md`, so its rows name entries you
+can go and read; example 5 sits in no log, which is why its blocks carry no rows.
+The `Sweep:` and `Priors:` observations were true against the tree on the day
+they were written and drift as it moves, which is why nothing re-runs them later.
+Example 4's entry in `docs/LESSONS.md` predates the block and carries only a
+`Class:` line, so the block here is what that same incident writes today.
+
+The product's log. The first has no worked section here; the other three are
+examples 1, 2 and 3:
+
+- 2026-02-11 — An export rounded a total a way nobody could find written down
+- 2026-03-04 — A card rendered blank instead of reporting why it couldn't render
+- 2026-04-22 — Two surfaces disagreed about which day a record belonged to
+- 2026-05-06 — Returning clients kept getting a version of the app nobody could reproduce
 
 ---
 
@@ -32,8 +59,8 @@ put one.
 catches" was never written down anywhere, so nothing could have flagged it.
 
 **Sweep.** *Sideways:* six other `catch` blocks in the same file; two swallowed
-identically, both fixed in the change. *Backwards:* first of its kind, no earlier
-issue shared the theme.
+identically, both fixed in the change. *Backwards:* first of its kind, so the
+block carries no prior rows and the instance number is 1.
 
 **Change landed.** The view model was extracted so it could be imported and
 tested, the call site was made to surface the error instead of swallowing it, and
@@ -47,6 +74,20 @@ a test and a log entry, not a new process.
 > imported, so the absence of a test was structural, not a decision anyone made.
 > *The rule:* if it can't be imported, it can't be tested, extract it first.
 > `[silent-failure]` `[untestable]`
+
+```
+Class: new — an error caught and turned into silence; no existing label names a call site that handles an error by returning nothing, leaving no signal for anyone downstream
+Instance: 1
+Level: contract
+Bucket: missing
+Not one up: convention would be a rule for every catch block in the app, and one call site with one swallowed error is not evidence that the convention is wrong
+Sweep: `grep -rn 'catch' src/home` → 6
+Sweep: `grep -rln 'return null' src/home` → 2
+Priors: `git log --date=short --format=%ad -- src/home` → 0 nominated
+Landed: 2 the view model was extracted so it could be imported, and a test drives the failing account shape through it, red: it failed against the swallowed error before the call site changed, src/home/summary-card.model.test.ts
+Landed: 10 the call site surfaces the error instead of returning nothing, src/home/summary-card.tsx
+Critic: not-run
+```
 
 ---
 
@@ -66,8 +107,10 @@ nowhere. The second implementation had no way to find it and reasonably invented
 its own.
 
 **Sweep.** *Sideways:* four call sites computed a day from a timestamp; three
-agreed by accident, one didn't. *Backwards:* second instance of the theme,
-an earlier issue had also come from a rule that existed only in someone's memory.
+agreed by accident, one didn't. *Backwards:* git nominated two entries. The
+February rounding issue is the same theme, a rule agreed in conversation and
+never written down, so this is instance 2 and the block reuses nothing, because
+that entry carried no label when it was written.
 
 **Change landed.** One exported function, every call site routed through it, and
 a test at the boundary, the late-evening case that produced the disagreement.
@@ -83,12 +126,33 @@ Second instance, so per step 5 this earned a check rather than only a test.
 > decision the codebase has.
 > `[duplicated-knowledge]` `[unrecorded-decision]`
 
+```
+Class: new — a decision that exists only in a conversation; the 2026-02-11 rounding entry is this class and carried no label when this was written, so there is nothing yet to reuse
+Instance: 2
+Level: contract
+Bucket: unrecorded
+Not one up: convention would be a rule about deriving values in general, and the evidence is two derivations of one value rather than a habit across the codebase
+Sweep: `grep -rn 'toLocaleDateString' src` → 4
+Sweep: `grep -rn 'startOfDay' src` → 1
+Priors: `git log --date=short --format=%ad -- src/records src/export` → 2 nominated
+- 2026-02-11 An export rounded a total: same-theme
+- 2026-03-04 A card rendered blank: unrelated
+Landed: 6 one exported dayOf(), and every call site routed through it, src/records/day-of.ts
+Landed: 2 a test at the boundary drives the late-evening timestamp that produced the disagreement, red: it failed against both old derivations, src/records/day-of.test.ts
+Landed: 1 the build fails when a file outside day-of.ts derives a date from a timestamp, red: it failed against the export's own derivation before that was removed, ci/no-inline-day.mjs
+Critic: not-run
+```
+
 ---
 
-## 3. Only users who had opened the app before saw the broken version, #252
+## 3. Returning clients kept getting a version nobody could reproduce, #252 and two before it
 
-**The issue.** A user reported the app showing an old version after a release.
-Nobody on the team could reproduce it.
+**What this one is.** A finding about a pattern, from the periodic read rather
+than from a bug. There is no single fix diff for git to nominate from, so it
+takes the theme block rather than the incident one.
+
+**The issue that started it.** A user reported the app showing an old version
+after a release. Nobody on the team could reproduce it.
 
 **Gate.** *Detection.* Nothing told anyone. QA tested on clean profiles, which is
 exactly the population that could not experience the bug.
@@ -96,23 +160,45 @@ exactly the population that could not experience the bug.
 **Bucket.** *Missing.* No one had specified what should happen for a client with a
 cached previous version, so there was no criterion to test against.
 
-**Sweep.** *Sideways:* every cached shell asset had the same exposure.
-*Backwards:* third issue in six months that only affected returning clients,
-**a theme.**
+**The read.** Three issues in six months only affected clients carrying state
+from a previous release, and each had been closed on its own. The `Window:`
+retrieval is what found them, it was run, and the three it returned are the three
+member rows. Who caught each is the part worth writing down: one reached a user,
+one was found by QA on a hunch, one was found by nobody and closed as
+unreproducible. Git also nominated the card entry from March, because this work
+touched a file its commit touched; it is not part of the theme, so the row
+dismisses it rather than leaving the nomination unanswered, and a dismissal does
+not raise `Count:`.
 
-**Change landed.** Navigations served network-first with a cache fallback, plus,
-because it was a theme, not an instance, "test with an existing cache, not only a
-clean profile" added to the QA pass. Per step 5, a theme buys a process change,
-not another patch.
+**Change landed.** Per step 5, a theme buys a process change rather than another
+patch: the QA pass gained a population it has to cover. Each `Landed:` row names
+something this work touched, because a theme entry's whole risk is landing as
+prose about a pattern with nothing to point at.
 
-> Only users who had opened the app before saw the broken version.
-> *What happened:* the cached shell was served ahead of the network, so returning
-> clients kept an old build after release.
-> *Why nothing caught it:* the failure is invisible on a clean profile, and every
-> gate ran on clean profiles.
-> *The rule:* any gate that only runs against a fresh client tests a population
-> that does not include your users.
+> Returning clients kept getting a version of the app nobody could reproduce.
+> *What happened:* three issues in six months reached only users carrying state
+> from a previous release, and each was closed on its own.
+> *Why nothing caught it:* every gate ran against a clean profile, which is the
+> one population that cannot experience any of them.
+> *The rule:* a gate that only runs against a fresh client tests a population
+> that does not include your users. The pattern is the finding here, not the
+> three bugs under it.
 > `[environment-specific]` `[stale-state]`
+
+```
+Theme: new — failures only a returning client can reach; no existing label names a class whose whole population is users carrying state from a previous release
+Window: `gh issue list --label returning-client --state all` → 3 items
+Count: 3
+- #231: nobody
+- #244: qa
+- #252: user
+- 2026-03-04 A card rendered blank: not-a-member
+Bucket: missing
+Landed: 5 the QA pass names a client with an existing cache as a population it has to cover, not only a clean profile, docs/qa-checklist.md
+Landed: 1 a release check loads the previous build's cached shell against the new release and fails if the old shell answers, red: it failed against the release that produced #252, ci/release-cache.spec.ts
+Landed: 6 navigations are served network-first with a cache fallback, so the rule sits in the service worker rather than in a reviewer's memory, src/sw/navigation.ts
+Critic: ran
+```
 
 ---
 
@@ -131,8 +217,10 @@ honored right up until the moment the file was rewritten, and it existed only as
 prose in a document being edited, with no check asserting it.
 
 **Sweep.** *Sideways:* every other cross-file pointer was checked; all resolved.
-*Backwards:* first of its kind in this repo, but it is the same bucket as #268,
-which is why it was worth a check rather than a note.
+*Backwards:* git nominated three entries sharing the day, all adjacent or
+unrelated, so this is a first of its kind here. It is the same bucket as #268,
+which is why it earned a check rather than a note, and that stays prose rather
+than a prior row: #268 is in a different log and no row reaches across.
 
 **Change landed.** The content restored, and `scripts/check.sh` now asserts the
 step headings are exactly 1–7 in order, a check that fails loudly if a step is
@@ -147,12 +235,29 @@ ever lost again. The general form: prose cannot guard prose.
 > structure mechanically.
 > `[unrecorded-decision]` `[no-check]`
 
+```
+Class: structure guarded only by prose
+Instance: 1
+Level: contract
+Bucket: unrecorded
+Not one up: convention would be a rule that every document's structure is asserted somewhere, and one document losing one step is not evidence for a rule that size
+Sweep: `grep -rn 'references/' plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md` → 7
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md` → 3 nominated
+- 2026-08-31 The front page claimed provenance: adjacent
+- 2026-08-31 Sequential section numbers: adjacent
+- 2026-08-31 Correct install instructions: unrelated
+Landed: 1 check.sh asserts the step headings are exactly 1 to 7 in order, red: deleting a step heading made it fail, scripts/check.sh
+Critic: not-run
+```
+
 ---
 
 ## 5. Illustrative, the buckets with no real instance yet
 
 **Not a real incident.** Included so *unread* and *misunderstood* have a worked
-shape; replace it with a real one the first time either occurs.
+shape; replace either with a real one the first time it occurs. Both blocks sit
+in no log, so neither carries prior rows, and both are at process level, which is
+the one level that omits `Not one up:`.
 
 **Unread.** A ticket's description says a list is sorted alphabetically. Comment
 14, added two days later after a conversation with support, says it should be
@@ -161,8 +266,31 @@ alphabetically. The gate is *the plan*, the bucket is unread, and the fix is
 not "read more carefully", it is that requirements added in comments get promoted
 into the description, because the location is the defect.
 
+```
+Class: new — a requirement that arrived somewhere nobody reads twice; no existing label names a requirement added after the description was written, in a place the builder had no reason to return to
+Instance: 1
+Level: process
+Bucket: unread
+Sweep: `grep -rn 'sortBy' src/lists` → 3
+Priors: `git log --date=short --format=%ad -- src/lists` → 0 nominated
+Landed: 4 the ticket template asks whether any comment adds or changes a requirement
+Landed: 6 a requirement added in a comment is promoted into the description before the ticket can be picked up
+Critic: not-run
+```
+
 **Misunderstood.** A ticket says archived items should be "hidden from the list."
 Product meant hidden from the default view and reachable through a filter;
 engineering built a hard exclusion. Both readings are defensible; the bug is the
 ambiguity. The fix is a readback, one acceptance criterion written as a concrete
 scenario with values, confirmed by the author before work starts.
+
+```
+Class: new — a requirement both sides read differently and neither noticed; no existing label names an ambiguity that produced two defensible readings rather than a mistake by either side
+Instance: 1
+Level: process
+Bucket: misunderstood
+Sweep: `grep -rn 'archived' src/lists` → 4
+Priors: `git log --date=short --format=%ad -- src/lists` → 0 nominated
+Landed: 8 whoever will build it restates the requirement as one concrete scenario with values, confirmed by the author before work starts
+Critic: not-run
+```

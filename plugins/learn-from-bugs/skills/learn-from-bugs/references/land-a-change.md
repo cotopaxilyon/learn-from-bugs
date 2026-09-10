@@ -4,7 +4,19 @@ Companion to `SKILL.md` step 5, for the targeted end of its table. Ranked, so
 take the first thing on this list that fits the gap. Step 6's entry carries a
 number per change landed, which is how a later reader sees how high the fixes in
 a theme have been landing. The number is a claim about what the change achieved,
-so claim the one it earns rather than the one it resembles:
+so claim the one it earns rather than the one it resembles.
+
+Those are two moments, and they read the list from opposite ends. Choosing what
+to land is keyed by the gap, which is what each item's closing "when the gap
+was..." describes. Writing the number down is keyed by what you actually built,
+which is the item's opening clause. **Where they disagree, the number follows
+what you built**, because that is what the number claims and what a later
+altitude read is counting. A rule that had lived in a conversation and now lives
+in one exported function is a relocation, 6, even though the gap it answers is
+the one item 7 names: what shipped is the relocation. Nothing here is a check, so
+two people can still land on different numbers; the tie-break is the one above:
+
+
 
 1. a runnable check wired into CI, which we prefer to everything below it
 2. a test at the boundary the class lives on, or a visual or interaction

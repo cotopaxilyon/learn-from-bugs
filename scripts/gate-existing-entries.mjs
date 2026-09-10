@@ -61,11 +61,13 @@ function excused(heading, code) {
 }
 
 // The fields deny_missing_field stands for. An entry excused from that code is
-// excused from all nine at once, so the excuse is held only while the entry
+// excused from all of them at once, so the excuse is held only while the entry
 // carries none of them: the recorded reason is that the block postdates the
 // entry, and a partial block means it no longer does. Class: is deliberately
-// absent, because every entry carries one and it predates the block.
-const BLOCK_FIELDS = ['Instance', 'Level', 'Bucket', 'Not one up', 'Sweep', 'Priors', 'Landed', 'Critic'];
+// absent, because every entry carries one and it predates the block. The theme
+// block's three fields were missing here, so an entry carrying a part-written
+// theme block kept an excuse that says the block postdates it.
+const BLOCK_FIELDS = ['Instance', 'Level', 'Bucket', 'Not one up', 'Sweep', 'Priors', 'Landed', 'Critic', 'Theme', 'Window', 'Count'];
 
 function carriesBlockField(body) {
   return BLOCK_FIELDS.some((f) => new RegExp(`^${f}:`, 'm').test(body));

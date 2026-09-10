@@ -29,10 +29,16 @@ and what fidelity each one carries. Gather first, then:
    became issues at all. In an agent-heavy workflow a fix can land without a
    ticket, and a window read only from the tracker will systematically understate
    every theme the agents are handling quietly.
-5. **Pick one theme.** Not five. The output is a single upstream change with the
-   issue count attached as its argument. That count is the most persuasive thing
-   you will ever have in a planning conversation, and it expires as soon as people
-   stop remembering the quarter.
+5. **Pick one theme, then write it down.** Not five themes. The output is a
+   single upstream change with the issue count attached as its argument. That
+   count is the most persuasive thing you will ever have in a planning
+   conversation, and it expires as soon as people stop remembering the quarter.
+   Write the read into the log using the theme block in step 6, which is where
+   the count stops being something you remember. Every member row names one
+   thing: a log entry by its date plus enough of its heading to pick it out from
+   the others on that day, or a ticket id that appears in the output of the
+   `Window:` command you ran. Neither the count nor the members are taken on
+   your word, which is the point of writing it there rather than in a summary.
 
 The failure mode here is producing an interesting summary and no change. If the
 read does not end with something entering a plan, a template, a checklist, or a

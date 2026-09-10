@@ -204,12 +204,45 @@ echo "== step 6 states the closed sets the gate enforces =="
 # "contract" all occur in step 6's prose, so a section-wide grep passed for a
 # value the block had dropped. Watched failing on a dropped "misunderstood" and,
 # after the narrowing, on a dropped "none" too.
-step6="$(sed -n '/^## 6\. Record it/,/^## 7\./p' "$SKILL" | sed -n '/^```$/,/^```$/p')"
+# Step 6 carries two fenced blocks now, the incident one and the theme one. A
+# single range over both let every assertion below be satisfied by the wrong
+# block: deleting Bucket: from the incident block passed, because the theme
+# block still offered its values, and deleting the theme referent passed because
+# the incident Landed: line matched. Each block is extracted on its own and each
+# rule is asserted against the block that owns it. Watched failing on both.
+step6_section="$(sed -n '/^## 6\. Record it/,/^## 7\./p' "$SKILL")"
+step6_issue="$(printf '%s' "$step6_section" | awk '/^```$/{n++; next} n==1')"
+step6_theme="$(printf '%s' "$step6_section" | awk '/^```$/{n++; next} n==3')"
+# Emptiness was the wrong assertion. The awk counts bare fences only, so a
+# language tag on the theme block's opening fence shifts the count and
+# step6_theme silently becomes step 6's trailing prose, which is non-empty and
+# passed. Assert the shape each block must have: the incident block opens with
+# Class: and the theme block with Theme:.
+if printf '%s\n' "$step6_issue" | head -1 | grep -q '^Class:' \
+   && printf '%s\n' "$step6_theme" | head -1 | grep -q '^Theme:'; then
+  pass "step 6 carries both blocks, extracted separately"
+else
+  fail "step 6's blocks no longer extract as an incident block opening Class: and a theme block opening Theme:; the per-block assertions below would be checking nothing"
+fi
 gate="plugins/learn-from-bugs/hooks/ledger-gate.mjs"
 sets_ok=1
-for value in call-site contract convention process missing unread unrecorded misunderstood none same-theme adjacent unrelated; do
-  grep -qF "'$value'" "$gate" || { fail "\"$value\" is not a closed-set value in ledger-gate.mjs"; sets_ok=0; }
-  printf '%s' "$step6" | grep -qF "$value" || { fail "step 6's block never offers the closed-set value \"$value\""; sets_ok=0; }
+# The two lists used to be typed out here, which is a restatement of what the
+# gate defines and drifts the moment the gate gains a value: `not-a-member`
+# landed in MEMBER_DISPOSITIONS and this check stayed green while SKILL.md could
+# have lost it entirely. They are read off the module's own exports now, so a new
+# closed-set value is undocumented-until-documented rather than unnoticed.
+values_of() { node --input-type=module -e "import('./$gate').then((m) => console.log([$1].join('\n')))"; }
+issue_values="$(values_of '...m.LEVELS, ...m.BUCKETS, ...m.DISPOSITIONS')"
+theme_values="$(values_of '...m.BUCKETS, ...m.MEMBER_DISPOSITIONS')"
+if [ -z "$issue_values" ] || [ -z "$theme_values" ]; then
+  fail "the gate's closed sets could not be read, so step 6 was checked against nothing"
+  sets_ok=0
+fi
+for value in $issue_values; do
+  printf '%s' "$step6_issue" | grep -qF "$value" || { fail "the incident block never offers the closed-set value \"$value\""; sets_ok=0; }
+done
+for value in $theme_values; do
+  printf '%s' "$step6_theme" | grep -qF "$value" || { fail "the theme block never offers the closed-set value \"$value\""; sets_ok=0; }
 done
 [ "$sets_ok" -eq 1 ] && pass "step 6 names every closed-set value the gate enforces"
 step6_prose="$(sed -n '/^## 6\. Record it/,/^## 7\./p' "$SKILL")"
@@ -222,7 +255,7 @@ fi
 # given above. A mint that is only a reason registers that reason as the label,
 # and until 2026-09-04 a mint registered nothing at all, so the label reuse the
 # backward sweep runs on had never once worked.
-if printf '%s' "$step6" | grep -qF 'new — <the label>; <why'; then
+if printf '%s' "$step6_issue" | grep -qF 'new — <the label>; <why' && printf '%s' "$step6_theme" | grep -qF 'new — <the label>; <why'; then
   pass "step 6's block shows the mint shape, naming the label before the reason"
 else
   fail "step 6's block no longer shows a mint that names its label first, which is what joins the reusable set"
@@ -232,10 +265,20 @@ fi
 # than one entry and one carries seven, so a bare date was a verdict on all of
 # them and the gate scored it as a match. Watched failing against the old
 # "- YYYY-MM-DD: same-theme" line.
-if printf '%s' "$step6" | grep -qE '^- YYYY-MM-DD <[^>]*heading>:.*same-theme'; then
+if printf '%s' "$step6_issue" | grep -qE '^- YYYY-MM-DD <[^>]*heading>:.*same-theme'; then
   pass "step 6's block shows a prior row keyed to an entry, not to a day"
 else
   fail "step 6's block no longer asks a prior row to name which entry on that day was read"
+fi
+if printf '%s' "$step6_theme" | grep -qE '^- YYYY-MM-DD <[^>]*heading>:.*qa'; then
+  pass "the theme block shows a member row keyed to an entry, not to a day"
+else
+  fail "the theme block no longer asks a member row to name which entry on that day it means"
+fi
+if printf '%s' "$step6_theme" | grep -qE '^Landed:.*,.*(path|referent)'; then
+  pass "the theme block shows a landed row ending in a referent"
+else
+  fail "the theme block no longer shows a Landed row ending in something the fix touched, which is the only thing stopping a theme entry from being prose"
 fi
 # Every deny code the gate defines is named in the test file, which is the rule
 # that file opens with. The first version of this asserted one code by name,
@@ -308,6 +351,19 @@ for f in "$REFS"/*.md; do
   if [ "$n" -le "$budget" ]; then pass "$(basename "$f") $n/$budget lines"
   else fail "$(basename "$f") is $n lines, budget $budget. Cut it, or raise the cap in a comment naming what was considered for removal."; fi
 done
+
+echo "== the unit suites run =="
+# CI ran check.sh and nothing else, so the gate's own tests were green only when
+# somebody remembered to run them locally. A contract asserted by a suite nothing
+# executes is a check that cannot fail, which is the 2026-09-01 entry. The suites
+# are wired here so CI runs them.
+if command -v node >/dev/null 2>&1; then
+  if node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs >/dev/null 2>&1
+  then pass "ledger-gate and gate-existing-entries suites"
+  else fail "unit suites failed; run: node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs"; fi
+else
+  fail "node is not on PATH, so the unit suites did not run"
+fi
 
 echo "== manifests validate =="
 if command -v claude >/dev/null 2>&1; then

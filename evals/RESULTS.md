@@ -274,3 +274,42 @@ the result, so a working gate scored as two failed arms. Fixed to read
 `permission_denials`. One run per arm; the deny and land outcomes are categorical
 enough that a second run would add little, but that is a judgment and not a
 measurement.
+
+## Run 9, 2026-09-09, Opus, the theme block driven through Claude Code
+
+`evals/drive-ledger-gate.sh` gains two Write arms for the theme block, whose gate
+path shares no field with the incident block. Six arms, one `claude -p` each, in
+a two-entry fixture repo. Verdicts read from `permission_denials` and from the
+file on disk, as in run 8.
+
+| Arm | Result |
+|---|---|
+| write-bare | denied, nothing landed |
+| write-good | landed |
+| edit-bare | denied, nothing landed |
+| edit-good | landed |
+| theme-bare | denied, nothing landed |
+| theme-good | landed, all six block fields present |
+
+**The theme arms needed a repo shaped like reality.** `mkrepo` committed the log
+and the source in one commit, so nothing had changed since the log was last
+committed, the touched-file set was legitimately empty, and no path referent
+could resolve. That is the gate working and it is not a shape an author is ever
+in: the fix lands, then the entry gets written. `mkrepo` gained a `with-fix`
+mode that commits a change after the scaffold. The four pre-existing arms pass no
+`prep` and are unaffected.
+
+**The first `theme-bare` could not fail differently, and is the more useful
+finding.** It named a theme and stopped, so it was refused whether dispatch
+worked or was inverted, and the arm was green either way. That is this repo's own
+"a check answering a cheaper question than its rule". It is now complete under
+the incident block plus a `Theme:` line, which is the exact shape a review found
+the gate allowing: an entry carrying both fields took the theme path and skipped
+every incident rule, landing `Level: banana` and `Instance: 42` green. Under the
+shipped gate that entry is refused `deny_two_blocks`; under the dispatch this arm
+now exists to catch, it landed.
+
+Both `theme-*` fixtures were dry-run through `decide()` before the drive, read
+out of the script itself rather than retyped. That found two real defects at no
+cost: the referent check going blind when handed no log path, and the fixture
+shape above. One run per arm, on the same reasoning as run 8.

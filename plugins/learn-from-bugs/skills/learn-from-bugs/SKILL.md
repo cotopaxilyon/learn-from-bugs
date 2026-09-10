@@ -434,6 +434,52 @@ Landed: <mechanism 1-10> <what>               one line per change; 1 and 2 need 
 Critic: ran | not-run
 ```
 
+### The other block, for a theme rather than an incident
+
+A periodic read produces a finding about a pattern, not about a bug, so it takes
+a different block. There is no single fix diff, which means git has nothing to
+nominate from, so the members are named by you and bound to a retrieval that is
+actually run:
+
+```
+Theme: <a label already in this log>          or: Theme: new — <the label>; <why no existing label fits>
+Window: `<retrieval command>` → <N> items     executed; N must equal the output's line count
+Count: <k>                                    k is the member rows below, counted for you
+- YYYY-MM-DD <words from that entry's heading>: qa | user | agent | nobody | not-a-member   who caught this one
+- <ticket-id>: qa | user | agent | nobody | not-a-member   the id has to appear in the Window output
+Bucket: missing | unread | unrecorded | misunderstood | none
+Landed: <mechanism 1-10> <what>, <path | ticket-id>    every row ends in a referent
+Critic: ran | not-run
+```
+
+`Theme:` draws on the same label set `Class:` does, and a mint here is reusable
+by a later incident entry, which is most of the value: a theme is the name of
+something you expect to see again. A member row keyed to a log entry uses the
+same date-plus-heading-fragment key a prior row uses, refused the same way when
+it is bare or ambiguous. `Count:` is derived from the rows rather than asserted
+beside them, counting the members and not the dismissals. Git nominates against
+a theme entry the same way it does against an incident entry, and every
+nominated entry has to appear in these rows: as a member, or as `not-a-member`
+where it is not part of the theme. Without that the block was the cheaper one to
+pick, and cheapest exactly where nomination was heaviest. A dismissal is an
+answer, not a member, so it does not raise `Count:` and a ticket id dismissed
+this way is not looked for in the `Window:` output. The `Window:` command is run and its line count has to equal the
+number you wrote, so the number comes off the output rather than out of your
+head, and any member named by ticket id has to appear in what that command
+returned. It also has to return at least as many items as there are members,
+because a retrieval that found fewer things than you are claiming did not find
+them: the `--json` forms are one line however many items they hold, so drop
+`--json` here. A retrieval that returned nothing may say `nothing`. That last one reaches only as far as a local gate can: a `cat` of a
+file you wrote yourself satisfies it, and the block says so rather than dressing
+it as a source. Every `Landed:` row ends in a path this work touched or created,
+or a ticket id, because a theme entry's whole risk is landing as prose about a
+pattern with nothing to point at. Paths are written from the repo root, the way
+`git diff --name-only` prints them, whatever directory you happen to be working
+in, and the commands in `Window:` and `Sweep:` are written and run from there
+too. The repo the gate reads is the one holding the log, so a block means the
+same thing wherever the session was opened. `Priors:` is the incident block's field and a
+theme entry carrying one is refused.
+
 A gate refuses the entry, and it is worth being exact about what it checks,
 because the rest is the critic's. Checked: the label matches one the log already
 uses, so the sweep can find it next time, or mints one. A mint names the label
@@ -551,8 +597,9 @@ The other way to run this is over a window (the last month of closed issues, a
 release's QA findings, a support queue) on a cadence rather than only when
 something hurts, because no single ticket in the pile would ever trigger it. Tally
 by theme rather than severity and pick one upstream change, with the issue count
-as its argument. Procedure in `references/backlog-read.md`, retrieval in
-`references/history-sources.md`.
+as its argument. It ends in a log entry like any other run of this, using the
+theme block in step 6 rather than the incident one. Procedure in
+`references/backlog-read.md`, retrieval in `references/history-sources.md`.
 
 ## When nothing could have caught it
 

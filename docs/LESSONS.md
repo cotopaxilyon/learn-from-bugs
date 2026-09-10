@@ -526,3 +526,138 @@ Where copying a whole block *is* correct (the shell form) put the lines in one
 block and say so. Format is part of the instruction, not decoration around it.
 
 Class: new — correct content lost in the delivery route; no existing label names correct content that fails only in the format or delivery path to the reader
+
+---
+
+## 2026-09-09 — A test helper called the gate a way the gate is never called
+
+**What happened.** `validateEntry` took `cwd` and an optional `logPath`. Given a
+`cwd` and no `logPath`, it did not fail: `touchedFiles` fell back to the HEAD
+commit, so the set of files "this fix touched" became whatever the last commit
+held. A test helper omitted `logPath`, and in that fixture HEAD is the scaffold
+commit carrying every file, so the touched set was never empty. Every assertion
+about which files a `Landed:` row may point at ran green against a set that
+could not be empty. The rule those assertions exist to enforce, that a referent
+names something this work changed, was never exercised. A reviewer found the
+underlying hole by construction: on a clean tree with no fix at all, creating one
+empty file bought a passing row.
+
+**Why nothing caught it.** The helper was written to be convenient rather than
+faithful, and nothing compared it to the only production caller. `decide()`
+always passes both arguments, so the configuration the tests exercised does not
+occur in the shipped path at all. The fallback made this invisible in both
+directions: it produced no error, and it produced a plausible answer, so the
+suite was green and the green meant nothing. This is the 2026-09-04 entry's shape
+one level out. There the tests seeded the label set the feature was supposed to
+produce; here the helper seeded the argument that decides what gets checked. In
+both, the test constructs the state it is meant to verify, and no count of
+passing assertions can see it.
+
+**The rule.** An optional argument that changes what a check examines is not
+optional. `validateEntry` now throws when given a `cwd` without a `logPath`,
+because the honest answers are the real path or `cwd: null`, which skips every
+check that reads the repo and says so. Five call sites were on the fallback and
+failed the moment the guard landed, which is the measurement. The general form:
+a default that answers a different question instead of failing is where a check
+goes to hide, and it hides from the suite as well as from the reader.
+
+A violation that would still pass: a helper that passes a `logPath` pointing at
+the wrong file, which the gate cannot tell from the right one.
+
+Class: new — a silent fallback that answers a different question; the closest existing label, an absent capability and a correct refusal producing the same output, names a capability that was missing, and here the check is present and answering about an input nobody ships
+Instance: 4
+Level: contract
+Bucket: missing
+Not one up: convention was owed rather than rejected, and it landed the same day in the entry below, where every repo-reading export declares a cwd contract asserted against a list derived from the module's own source. This entry stays at contract because what it landed is one call-site guard; the sweep that generalised it belongs to that entry, which also records that this guard was written in the shape of the class it was written to kill.
+Sweep: `grep -n 'catch { return \[\]' plugins/learn-from-bugs/hooks/ledger-gate.mjs` → 2 sites, both returning an empty set when git does not answer
+Sweep: `grep -n 'cwd: dir, logPath' plugins/learn-from-bugs/hooks/ledger-gate.test.mjs` → 23 call sites now carry the log path beside the cwd
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/hooks plugins/learn-from-bugs/skills scripts/check.sh evals/drive-ledger-gate.sh` → 13 nominated
+- 2026-08-31 A fix recorded in this log: adjacent
+- 2026-08-31 A documented step vanished: unrelated
+- 2026-08-31 The skill did not trigger: unrelated
+- 2026-08-31 Three trigger tests: same-theme
+- 2026-08-31 One agent's unreviewed conclusion: unrelated
+- 2026-08-31 Sequential section numbers: unrelated
+- 2026-08-31 The front page claimed provenance: unrelated
+- 2026-08-31 Correct install instructions: unrelated
+- 2026-09-01 The critic proposed for step 7: unrelated
+- 2026-09-01 Three gates failed while green: same-theme
+- 2026-09-01 A scoped grep: adjacent
+- 2026-09-04 Thirteen entries in: same-theme
+- 2026-09-04 A command run to answer: unrelated
+Landed: 2 ledger-gate.test.mjs asserts the pair is refused and that cwd null still passes, red: five existing call sites were on the fallback and failed the moment the guard landed
+Landed: 3 ledger-gate.mjs throws on cwd without logPath, naming both honest alternatives in the message
+Critic: ran
+
+---
+
+## 2026-09-09 — The guard written to kill a class was written in the shape of the class
+
+**What happened.** The morning's entry landed a guard: `validateEntry` throws when
+given a `cwd` without a `logPath`, so a helper can no longer test a configuration
+production never produces. The guard was a truthiness test, `if (cwd && !logPath)`.
+`''` is falsy, so an empty `cwd` skipped the guard and then read as the documented
+`cwd: null` safe mode, and every check that reads the repo was skipped in silence.
+A real path, `"."` and an omitted `cwd` all denied. `''` and `null` were allowed,
+and `cwd` is a payload field, so this was reachable from the only production
+caller. Two more of the same shape sat beside it. `LFB_LOG_NAME=""` survived a
+`??` default, no basename ever equalled it, and every write returned null with the
+gate saying nothing at all. And `touchedFiles`, `untrackedFiles`, `nominate` and
+`runCommand` each answered `[]` or `false` for a `cwd` they could not use, which
+is the answer to "what did this fix touch" rather than "the repo could not be
+read". The container failed open too: the `throw` had no top-level catch, and a
+PreToolUse hook exiting non-zero and non-2 is a non-blocking error, so any
+internal exception was a permit.
+
+**Why nothing caught it.** The fix was written against the class it names and then
+written in that class's own shape, and nothing asked whether it was. A truthiness
+test is itself a silent fallback: it answers "is this usable" with "is this
+present", a cheaper question, and the two agree on every value anybody tries by
+hand. The morning entry did what the skill asks and described a violation that
+would still pass, a `logPath` pointing at the wrong file, so the exercise ran and
+pointed away from the nearer instance. Every suite stayed green because `decide()`
+is the only caller that supplies these values and no test drove `decide()` with
+anything but a real path. CI compounded it: `check.sh` was the whole of CI and
+never ran `node --test`, so the suites were green only when somebody remembered to
+run them.
+
+**The rule.** A fix for a class is read back against its own class before it lands,
+and the reading is mechanical wherever it can be. Every export that reads the repo
+now declares its `cwd` contract, and the list of those exports is derived from the
+module's own source rather than restated in the test, so an export added later
+fails the assertion until somebody gives it a contract. That list caught two
+exports this fix had missed on its first run. Only `null` means skip, spelled
+`cwd === null` at every site rather than `!cwd`. The suites are wired into
+`check.sh` so CI runs them.
+
+A violation that would still pass: a `cwd` that is a real path in no git repo.
+`touchedFiles` returns `[]` there, `nominate` nominates nothing, and an entry that
+ignores every prior is allowed. `gitReachable` exists and answers exactly this, and
+`landedRows` consults it, but the nomination path does not.
+
+Class: a silent fallback that answers a different question
+Instance: 5
+Level: convention
+Bucket: none
+Not one up: process would be a review step asking of every fix whether it is written in the shape of the class it fixes, and a step answered by its own author is the 2026-09-01 step 7 finding over again; the derived contract asserts the mechanical form without needing a reader
+Sweep: `grep -n 'requireCwd(' plugins/learn-from-bugs/hooks/ledger-gate.mjs` → 6
+Sweep: `grep -n 'cwd === null' plugins/learn-from-bugs/hooks/ledger-gate.mjs` → 2
+Priors: `git log --date=short --format=%ad -- plugins/learn-from-bugs/hooks plugins/learn-from-bugs/skills scripts/check.sh evals` → 14 nominated
+- 2026-08-31 A documented step vanished: unrelated
+- 2026-08-31 A fix recorded in this log: adjacent
+- 2026-08-31 Correct install instructions: unrelated
+- 2026-08-31 One agent's unreviewed conclusion: unrelated
+- 2026-08-31 Sequential section numbers: unrelated
+- 2026-08-31 The front page claimed provenance: unrelated
+- 2026-08-31 The skill did not trigger: adjacent
+- 2026-08-31 Three trigger tests: same-theme
+- 2026-09-01 A scoped grep: adjacent
+- 2026-09-01 The critic proposed for step 7: same-theme
+- 2026-09-01 Three gates failed while green: same-theme
+- 2026-09-04 A command run to answer: unrelated
+- 2026-09-04 Thirteen entries in: adjacent
+- 2026-09-09 A test helper called the gate: same-theme
+Landed: 1 check.sh runs the unit suites, so CI executes the contract instead of trusting somebody ran it, red: a deliberately thrown test made check.sh report the suite failing, scripts/check.sh
+Landed: 2 the cwd contract is asserted against the module's own export list, red: adding an unguarded repo-reading export failed it, and on its first run it caught runCommand and validateEntry, plugins/learn-from-bugs/hooks/ledger-gate.test.mjs
+Landed: 6 the contract moved out of six separate truthiness tests into requireCwd and logNameFrom, plugins/learn-from-bugs/hooks/ledger-gate.mjs
+Critic: not-run

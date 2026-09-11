@@ -51,7 +51,10 @@ PRs and reviews never mention it, a citation count of zero across the window
 however good the artifact. Second form: components hand-built in a feature
 where the design system has the same component. Retrieval: name the artifact's
 citation tokens, then `grep -c` each over the exported PR bodies, review
-comments and ticket comments. Fires for another reason when a bot or a
+comments and ticket comments. For the design system, set
+`grep -rl "<system import>" src` against `find src -name "*Button*"` and the
+like, so a hand-built component the system already ships is a file in the
+second list and not the first. Fires for another reason when a bot or a
 template line cites it on every PR, separable by author, and when a team
 follows the checklist without naming it, which is not separable from the
 tracker at all. It points at step 5's mechanism 5 when the artifact is

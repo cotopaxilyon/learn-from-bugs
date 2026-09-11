@@ -1521,10 +1521,12 @@ test('every command the log already uses still vets', () => {
   // a binary leaving ALLOWED drops its commands out of the corpus rather than
   // failing them: `delete ALLOWED.gh` left this green while the hardcoded array
   // it replaced went red on two. Pin the set so a removal is a red here and a
-  // deliberate edit there.
+  // deliberate edit there. It cuts the other way too: a reference recommending
+  // a binary not yet in this list is a red, which is the moment to check the
+  // gate will run it. `find` entered that way on 2026-09-11.
   assert.deepEqual(
     [...new Set(refCorpus.map(({ cmd }) => cmd.split(/\s+/)[0]))].sort(),
-    ['gh', 'git', 'grep', 'sort'],
+    ['find', 'gh', 'git', 'grep', 'sort'],
     'a binary the references recommend stopped being one the gate will run',
   );
   assert.ok(refCorpus.length >= 10, `expected the references' own corpus, found ${refCorpus.length}`);

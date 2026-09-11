@@ -12,6 +12,72 @@ point of the log: entries here are inputs, and the checks are the output.
 
 ---
 
+## 2026-09-11 — Six checks in this repo ran green while the defect they were written for sat in front of them
+
+**What happened.** Three more landed in one sitting, which is what made this a
+consolidation pass rather than three entries. `check-examples.mjs` recognised a
+step 6 block by its first line, so one blank line after an opening fence, which
+renders as nothing at all, dropped a whole block out of scope; the block left
+behind carried `Level: proces` and `Bucket: misunderstod` and the checker
+reported exit 0. `release.sh post` answered "the installed copy is this version"
+by asking whether a cache directory existed, and `claude plugin marketplace
+update` creates one for every version it finds, so 1.2.0 and 1.2.1 both released
+green while `installed_plugins.json` still pointed at 1.1.0 and neither release
+was ever installed. And `Bucket: none` was a closed-set value the gate enforced
+while 3b named only four, so two readers picked different buckets for one fixture
+and each was filling a hole rather than reading one.
+
+Six entries in this log are now the same shape. What found them is worth as much
+as the count: three were found by the step 7 critic pass, and one by the ledger
+gate refusing an entry. The control that catches this class is the fresh-context
+reader, every time, and it catches it after the check has shipped and gone green.
+No QA pass and no user has ever found one.
+
+**Why nothing caught it.** The rule is written down. Step 5 says to watch a new
+check fail against the defect it exists to catch, and `checks-that-cannot-fail.md`
+is a shipped reference about exactly this. It is not reaching the moment a check
+gets written. Each of these was watched red against *something*, and the
+something was a case the author had in mind rather than the class the check
+claims. A check recognising its subject by a distinguishing feature inherits that
+feature as an escape hatch, and the subject then leaves the set quietly: the
+block with no first line, the version with no cache directory of its own. What
+makes it hard to see from inside is that the check is not broken and does not
+look untested. It runs, it passes, and the question it is answering is one nobody
+wrote down.
+
+**The rule.** Watching a check go red is not enough on its own. Name the set the
+check is supposed to range over, then ask what removes a member from that set
+without removing the defect, and watch it red on that. Every one of these six had
+a cheap version of that question available and none of them was asked.
+
+Theme: a wired check that cannot fire
+Window: `grep -n '^Class:.*cannot fire\|^Class:.*answers a different question\|^Class:.*producing the same output' docs/LESSONS.md` → 6 items
+Count: 6
+- 2026-08-31 Three trigger tests: agent
+- 2026-09-01 Three gates failed while green: agent
+- 2026-09-03 A gate shipped green: agent
+- 2026-09-04 Thirteen entries in: agent
+- 2026-09-09 A test helper called the gate: agent
+- 2026-09-09 The guard written to kill a class: agent
+- 2026-08-31 A documented step vanished: not-a-member
+- 2026-08-31 A fix recorded in this log: not-a-member
+- 2026-08-31 Correct install instructions: not-a-member
+- 2026-08-31 One agent's unreviewed conclusion: not-a-member
+- 2026-08-31 Sequential section numbers: not-a-member
+- 2026-08-31 The front page claimed provenance: not-a-member
+- 2026-08-31 The skill did not trigger: not-a-member
+- 2026-09-01 A scoped grep: not-a-member
+- 2026-09-01 The critic proposed for step 7: not-a-member
+- 2026-09-04 A command run to answer: not-a-member
+Bucket: unread
+Landed: 2 the examples checker recognises a block by any step 6 field, and reports any untagged fence carrying none, red: a blank line after the opening fence hid a block holding two values the gate refuses and it passed at exit 0, scripts/check-examples.mjs
+Landed: 1 the release check reads installed_plugins.json for the version actually running rather than a cache directory an earlier step in the same sequence creates, red: it failed against a version that is not installed, scripts/release.sh
+Landed: 3 3a says to stop at `none` when a gate ran and passed the defect, and names the shape, a gate asking a cheaper question than the one it was written for, plugins/learn-from-bugs/skills/learn-from-bugs/SKILL.md
+Landed: 3 checks-that-cannot-fail.md asks for the set the check ranges over, and for what leaves that set without taking the defect along, which is the rule below and it was in this entry and nowhere else until now, plugins/learn-from-bugs/skills/learn-from-bugs/references/checks-that-cannot-fail.md
+Critic: ran
+
+---
+
 ## 2026-09-04 — Thirteen entries in, the log had never once been able to reuse a label
 
 **What happened.** Writing the entry below, the class that fitted was the one the

@@ -106,6 +106,20 @@ claude plugin install learn-from-bugs@cotopaxilyon
 Restart Claude Code. The skill triggers on its own when you describe a bug, a QA
 failure, or a regression, and you can invoke it directly with `/learn-from-bugs`.
 
+## Update an install you already have
+
+Two commands, and **not** `plugin install`, which answers "already installed" and
+does nothing whatever version you are on:
+
+```bash
+claude plugin marketplace update cotopaxilyon
+claude plugin update learn-from-bugs@cotopaxilyon
+```
+
+Restart, then check with `claude plugin list`, which prints the version you are
+actually running. Worth doing: the first command caches the new version without
+installing it, so a machine can hold the files for a release it is not running.
+
 ## Use it
 
 > QA failed #204, the dashboard shows "undefined" instead of a name when the

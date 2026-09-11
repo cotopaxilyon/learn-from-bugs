@@ -142,10 +142,17 @@ if (fs.existsSync(logPath)) {
 let entryIsNew = null;
 if (entryHeading) {
   try {
+    // stdio's stderr leg is 'ignore', the way ledger-gate.mjs's own
+    // touchedFiles/gitReachable already run git: when the log has no commit
+    // yet, `git log` returns nothing, `.pop()` is undefined, and `git show
+    // undefined:...` fails as designed -- but it printed `fatal: invalid
+    // object name 'undefined'.` to stderr first, which read as a failure in
+    // an arm's own log even though the catch below handles it correctly
+    // (2026-09-11 re-verdict N5, visible in probe P4b).
     const first = execFileSync('git', ['log', '--format=%H', '--', `docs/${LOG_NAME}`],
-      { cwd: armDir, encoding: 'utf8' }).trim().split('\n').filter(Boolean).pop();
+      { cwd: armDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n').filter(Boolean).pop();
     const shipped = execFileSync('git', ['show', `${first}:docs/${LOG_NAME}`],
-      { cwd: armDir, encoding: 'utf8' });
+      { cwd: armDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     entryIsNew = !shipped.includes(entryHeading);
   } catch { entryIsNew = null; }
 }
@@ -154,11 +161,21 @@ if (entryHeading) {
 // answer key is new to this scorer and there is no existing behaviour on this
 // path to preserve. Incident fixtures never take this branch, so entry and
 // entryHeading are untouched for them.
+let entriesInLog = null;
 if (kind === 'theme' && fs.existsSync(logPath)) {
   const gateEntries = entriesIn(fs.readFileSync(logPath, 'utf8'));
+  entriesInLog = gateEntries.length;
   if (gateEntries.length > 0) {
-    entry = gateEntries[0].body;
-    entryHeading = `${gateEntries[0].date} — ${gateEntries[0].title}`;
+    // Every theme signal used to read entriesIn(log)[0], the first entry by
+    // file position rather than by date. An arm that appended an incident
+    // entry and then its theme entry -- the log header says "Newest first",
+    // so a compliant arm prepends -- was graded entirely on the entry it
+    // wrote first, with the correct theme entry sitting ungraded below it
+    // (probe P5). Select the newest by heading date instead; on a tie, the
+    // first by position (Array#reduce only replaces on strictly-later dates).
+    const newest = gateEntries.reduce((best, e) => (!best || e.date > best.date ? e : best), null);
+    entry = newest.body;
+    entryHeading = `${newest.date} — ${newest.title}`;
   }
 }
 
@@ -170,10 +187,13 @@ const field = (name) => {
   const m = block.match(new RegExp(`^${name}:[ \\t]*(.*)$`, 'm'));
   return m ? m[1].trim() : null;
 };
-const priorRows = block
-  ? [...block.matchAll(/^- (\d{4}-\d{2}-\d{2})[ \t]+(.*):[ \t]*([a-z-]+)\s*$/gm)]
-      .map((m) => ({ date: m[1], fragment: m[2].trim(), disposition: m[3] }))
-  : [];
+// Read body-wide, not scoped to the Class:/Theme:-anchored `block` slice: the
+// gate itself places no ordering requirement on where a Priors: row sits
+// relative to Class:, so scoping this read to `block` silently dropped a
+// gate-accepted row placed above the anchor line (review F2, backlog-read
+// probe P3 found the same class of bug in landedRanks/landedTails below).
+const priorRows = [...entry.matchAll(/^- (\d{4}-\d{2}-\d{2})[ \t]+(.*):[ \t]*([a-z-]+)\s*$/gm)]
+  .map((m) => ({ date: m[1], fragment: m[2].trim(), disposition: m[3] }));
 const sameThemeFromBlock = priorRows.filter((r) => r.disposition === 'same-theme').map((r) => r.date);
 // From the block when there is one, else every expected date the entry text
 // mentions anywhere, so the no-block baseline is not scored as having cited
@@ -189,9 +209,9 @@ const bucket = field('Bucket');
 // 6. landed referents. Named in the entry is one question; resolving to a path
 // in the arm is another, and a row can pass the first while pointing at a file
 // that was never created.
-const landedTails = block
-  ? [...block.matchAll(/^Landed:[ \t]*\d{1,2}\b(.*)$/gm)].map((m) => m[1].split(',').pop().trim())
-  : [];
+// Body-wide, same reason as priorRows above: a gate-accepted Landed: row
+// written above the block's anchor line used to score as absent.
+const landedTails = [...entry.matchAll(/^Landed:[ \t]*\d{1,2}\b(.*)$/gm)].map((m) => m[1].split(',').pop().trim());
 const expectedReferents = key.expected_landed_referents ?? [];
 const referentsNamed = expectedReferents.filter((p) => entry.includes(p));
 // What the run changed, not what exists. Existence was the first version and it
@@ -234,9 +254,11 @@ const datesPath = path.join(armDir, 'src/dates.js');
 const datesSrc = fs.existsSync(datesPath) ? fs.readFileSync(datesPath, 'utf8') : '';
 
 const rankHits = [...entry.matchAll(/mechanism\s+(\d{1,2})\b/gi)].map((m) => Number(m[1]));
-const landedRanks = block
-  ? [...block.matchAll(/^Landed:[ \t]*(\d{1,2})\b/gm)].map((m) => Number(m[1]))
-  : [];
+// Body-wide, same reason as priorRows above (backlog-read probe P3: a
+// gate-accepted entry with Landed: written above Theme: scored
+// landed_mechanisms: [] while bucket, level, block_kind and the member rows
+// all still scored correctly, reading as a correct arm that landed nothing).
+const landedRanks = [...entry.matchAll(/^Landed:[ \t]*(\d{1,2})\b/gm)].map((m) => Number(m[1]));
 
 // 8. theme-block signals. Only computed, and only added to the output, when
 // the answer key says kind: "theme" — an incident-kind run (the default)
@@ -260,8 +282,22 @@ if (kind === 'theme') {
   // built from.
   const hasThemeField = fieldOf(entry, 'Theme') !== null;
   const hasClassField = fieldOf(entry, 'Class') !== null;
-  const themeLine = entry.match(/^Theme:[ \t]*.*$/m);
-  const blockKind = hasThemeField && themeLine && /^Window:/m.test(entry.slice(themeLine.index)) ? 'theme'
+  // Window: is read the same way the gate reads it -- body-wide via fieldOf,
+  // with no requirement on where it sits relative to Theme:. An earlier
+  // version of this check scoped the read to a slice starting at the Theme:
+  // line, which missed a gate-accepted entry that wrote Window: above
+  // Theme: (2026-09-11 re-verdict N4 -- the same F2 class already fixed for
+  // landedRanks/landedTails/priorRows above, found here on the same day by
+  // the fix that was supposed to close it). The column-0 anchor on Theme: is
+  // still necessary and not sufficient on its own: the Window: value still
+  // has to parse as a backticked command under the gate's own
+  // splitSearchLine, or a pure narrative that happens to open a `Theme:`
+  // line and a `Window:` line of ordinary prose scores block_kind: theme,
+  // which then also flips member_recall into block mode where a narrative
+  // has no rows (probe P8).
+  const windowField = fieldOf(entry, 'Window');
+  const windowLineIsCommand = windowField !== null && splitSearchLine(windowField) !== null;
+  const blockKind = hasThemeField && windowLineIsCommand ? 'theme'
     : hasClassField ? 'incident' : 'none';
 
   // window_ran: the Window: command is parsed with the gate's own arrow
@@ -269,7 +305,6 @@ if (kind === 'theme') {
   // vetCommand and runCommand, and the stated count is checked against the
   // line count the command actually returned, not trusted from the entry's
   // own prose.
-  const windowField = fieldOf(entry, 'Window');
   let windowRan = false, windowCount = null;
   if (windowField) {
     const parsed = splitSearchLine(windowField);
@@ -291,33 +326,99 @@ if (kind === 'theme') {
   const themeBucket = fieldOf(entry, 'Bucket');
   const themeLevel = fieldOf(entry, 'Level');
   const themeCritic = fieldOf(entry, 'Critic');
-  const prose = blockStart ? entry.slice(0, blockStart.index) : entry;
-  const bucketInProse = BUCKETS.find((b) => new RegExp(`\\b${b}\\b`, 'i').test(prose)) ?? null;
+  // Prose is "everything before the block" only when there is a genuine
+  // block (blockKind === 'theme'); a stray column-0 Theme:/Window: pair with
+  // no real block (P8) is not a block boundary, so the whole entry is prose.
+  const prose = blockKind === 'theme' && blockStart ? entry.slice(0, blockStart.index) : entry;
+  // Pick the bucket word by last mention, not by BUCKETS array order. The
+  // array is ['missing', 'unread', 'unrecorded', 'misunderstood', 'none'],
+  // so an entry naming unread as the finding and also writing the ordinary
+  // sentence "the requirement was missing from the description" used to
+  // report bucket_in_prose: missing -- the first array member the text
+  // contains, not the word the entry argues for (probe P1a; "none", last in
+  // the array, does not mask anything the same way -- probe P9). Last
+  // mention of any bucket word wins instead.
+  //
+  // Residual, why this is reported rather than scored (2026-09-11 re-verdict
+  // B2): last mention swapped an array-order bias for a position bias, not
+  // a fix. The same P1a entry with its closing sentence rewritten "In each
+  // case it was missing from the description" -- ordinary phrasing, moved to
+  // the end -- reports `missing` again, because "missing" is now simply the
+  // later mention. Any bucket word placed after the one the entry argues
+  // for wins the same way "missing" did before.
+  const pickBucketWord = (text) => {
+    let found = null, latest = -1;
+    for (const b of BUCKETS) {
+      const re = new RegExp(`\\b${b}\\b`, 'ig');
+      let m, last = -1;
+      while ((m = re.exec(text))) last = m.index;
+      if (last > latest) { latest = last; found = b; }
+    }
+    return found;
+  };
+  const bucketInProse = pickBucketWord(prose);
 
   // member_recall / decoys_misfiled: rows come from themeMemberRows(entry),
   // the gate's own anchor/close/row-region parse, read body-wide the same way
   // fieldOf is — not a second copy of `validateThemeEntry`'s region logic. A
-  // no-block entry falls back to ids inside a sentence naming the bucket
+  // no-block entry falls back to ids inside a paragraph naming the bucket
   // word, and reports which mode it used.
+  //
+  // The mode gate used to be `if (block)` -- any column-0 Class:/Theme: line
+  // anywhere in the entry, the same over-eager anchor block_kind had (P8).
+  // A pure narrative carrying a stray Theme:/Window: pair with no real block
+  // was read in block mode, where a narrative has no member rows, and scored
+  // member_recall: 0 regardless of what it said. Gate on the validated
+  // blockKind instead, so prose mode is used whenever there is no real block.
   const idPattern = new RegExp(ticketPattern().source.replace(/^\^/, '').replace(/\$$/, ''), 'g');
   let claimedIds = [];
+  let dismissedIds = [];
   let memberRecallMode;
-  if (block) {
+  if (blockKind === 'theme') {
     memberRecallMode = 'block';
     const { rows } = themeMemberRows(entry);
     claimedIds = rows.filter((r) => MEMBER_DISPOSITIONS.includes(r.caught) && r.caught !== NOT_A_MEMBER).map((r) => r.key);
+    dismissedIds = rows.filter((r) => r.caught === NOT_A_MEMBER).map((r) => r.key);
   } else {
     memberRecallMode = 'prose';
-    const bucketWord = BUCKETS.find((b) => new RegExp(`\\b${b}\\b`, 'i').test(entry));
+    const bucketWord = pickBucketWord(entry);
     if (bucketWord) {
-      for (const sentence of entry.split(/(?<=[.!?])\s+/)) {
-        if (new RegExp(`\\b${bucketWord}\\b`, 'i').test(sentence)) {
-          for (const m of sentence.matchAll(idPattern)) claimedIds.push(m[0]);
+      // Paragraph-scoped, not sentence-scoped: the old split on /(?<=[.!?])
+      // \s+/ put a bullet list under the sentence naming the bucket word in
+      // a different chunk from that sentence, so an entry naming the bucket
+      // and then listing its members as bullets scored member_recall: 0
+      // (probe P1c). A paragraph (text between blank lines) is the unit
+      // instead, so a list directly under the naming sentence, with no blank
+      // line between them, is read together with it.
+      //
+      // That alone still missed the more common Markdown form: a bullet
+      // list set off from its introducing sentence by a blank line, which
+      // the paragraph split itself puts in a different paragraph (2026-09-11
+      // re-verdict B3, probe run5 A2 -- the same under-count P1c named,
+      // reached by the more ordinary of the two spacings). If the paragraph
+      // right after the one naming the bucket is nothing but list items,
+      // read it together with the naming paragraph too. This does not chase
+      // every spacing a list could use; it is the cheap width that reaches
+      // the common one, not a claim the read is now exhaustive -- prose mode
+      // is a reported lead, not a scored signal, below.
+      const bucketRe = new RegExp(`\\b${bucketWord}\\b`, 'i');
+      const paragraphs = entry.split(/\n\s*\n/);
+      const isListParagraph = (p) => {
+        const lines = p.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+        return lines.length > 0 && lines.every((l) => /^[-*–—•]\s+/.test(l));
+      };
+      for (let i = 0; i < paragraphs.length; i += 1) {
+        if (!bucketRe.test(paragraphs[i])) continue;
+        for (const m of paragraphs[i].matchAll(idPattern)) claimedIds.push(m[0]);
+        const next = paragraphs[i + 1];
+        if (next && isListParagraph(next)) {
+          for (const m of next.matchAll(idPattern)) claimedIds.push(m[0]);
         }
       }
     }
   }
   const claimedSet = new Set(claimedIds);
+  const dismissedSet = new Set(dismissedIds);
   const expectedMembers = key.expected_bucket_members ?? [];
   const expectedDecoys = Object.keys(key.expected_decoys ?? {});
   const memberHits = expectedMembers.filter((id) => claimedSet.has(id));
@@ -325,9 +426,17 @@ if (kind === 'theme') {
   const memberRecall = expectedMembers.length === 0 ? null
     : Number((memberHits.length / expectedMembers.length).toFixed(2));
   const decoysMisfiled = decoyHits.length;
-  // Assert the two counts sum to at most the whole universe, and flag the
-  // arm that names every ticket a member: recall 1.0 with decoys 0 cannot
-  // both hold there, since the decoys would be counted too.
+  // decoysMisfiled alone cannot separate "no decoy is named" from "every
+  // decoy was read and dismissed" -- both score 0. themeMemberRows already
+  // returns the not-a-member rows (dismissedIds above); intersect those with
+  // the key's own decoys instead of leaving dismissal unmeasured.
+  const decoysDismissed = expectedDecoys.filter((id) => dismissedSet.has(id)).length;
+  // Flag the arm that names every ticket a member: recall 1.0 with decoys 0
+  // cannot both hold there, since the decoys would be counted too. (The
+  // symmetric "assert the two sum ≤ 12" does not belong here: memberHits and
+  // decoyHits are both filters over the key's own disjoint six-and-six sets,
+  // so the sum can never exceed 12 by construction and that assertion could
+  // never fail.)
   const universe = expectedMembers.length + expectedDecoys.length;
   const sumCheckFlag = memberHits.length + decoysMisfiled === universe;
 
@@ -341,24 +450,91 @@ if (kind === 'theme') {
   // a real symptom tally naming its symptom with a word that happens to
   // appear in two or more titles. The label set is the fixture's own closed
   // vocabulary and is what the pre-registration actually names.
+  //
+  // This detector, bucket_in_prose, prose-mode member_recall and
+  // rate_observation_as_finding are reported, not scored (2026-09-11
+  // re-verdict, replacing further heuristic repair on any of the three). A
+  // hand-picked subject-or-tally narrowing below still passes only the three
+  // sentences it was written against and fires on their neighbours in the
+  // same register (B1: "The bug reports cluster into one shape rather than
+  // twelve" still scores true, a leading article satisfying the same subject
+  // branch as no article at all). Last-mention bucket-word selection swapped
+  // an array-order bias for a position bias and still names the wrong bucket
+  // on an ordinary closing sentence (B2: "...it was missing from the
+  // description," moved to the end of the same entry P1a already used, still
+  // reports `missing`). And member_recall's paragraph-scoped id read still
+  // depends on how the author spaced a list under the naming sentence, not
+  // on what the list says (B3: a blank line before an otherwise identical
+  // bullet list drops recall from 0.83 to 0, even after the fix below). None
+  // of the three is a check a five-minute probe cannot refute by rewording,
+  // which is exactly what a scored field must not be. Read as leads a person
+  // confirms against the entry, via `reported` below and the answer key's
+  // Hand-graded section, never as a verdict.
+  //
+  // The label set ranges over this file. Without it, the detector silently
+  // ranges over nothing: symptom.md scored a clean `false` in an arm whose
+  // tickets.jsonl was not at the root, with nothing said about why (probe
+  // P12). window_ran degrades visibly to false in the same situation; this
+  // did not, so it fails loudly instead of grading a theme key against an
+  // empty set.
   const ticketsPath = path.join(armDir, 'tickets.jsonl');
+  if (!fs.existsSync(ticketsPath)) {
+    console.error(`${ticketsPath} does not exist, and a theme key's symptom_tally_as_finding cannot be graded without the label set it reads from`);
+    process.exit(2);
+  }
   const labels = new Set();
-  if (fs.existsSync(ticketsPath)) {
-    for (const line of fs.readFileSync(ticketsPath, 'utf8').split('\n').filter(Boolean)) {
-      let t;
-      try { t = JSON.parse(line); } catch { continue; }
-      for (const lab of t.labels ?? []) labels.add(String(lab).toLowerCase());
-    }
+  for (const line of fs.readFileSync(ticketsPath, 'utf8').split('\n').filter(Boolean)) {
+    let t;
+    try { t = JSON.parse(line); } catch { continue; }
+    for (const lab of t.labels ?? []) labels.add(String(lab).toLowerCase());
   }
   const LABEL_SYNONYMS = { a11y: 'accessibility' };
   const afterHeading = entry.split('\n').slice(1).join('\n');
   const firstParagraph = afterHeading.split(/\n\s*\n/)[0] ?? '';
+  // Note (P10, not fixed here): an entry with no blank line makes this
+  // "first paragraph" the whole entry, block included, which widens the scan
+  // into the block's own field lines. No standalone false positive was found
+  // from it against a real entry -- it amplifies the three below rather than
+  // being its own defect.
+  //
+  // A label that is also ordinary English in this domain ("bug", "ux" and
+  // "security" all fired on prose that never meant the fixture's label --
+  // "Not one of these is a bug in the usual sense" (P2d), "This is not a UX
+  // problem" (P2e), "...from a security tab left open to a mobile filter
+  // bar..." (P2b)) counts only when it reads as the sentence's own subject
+  // or sits inside a tally shape ("N tickets", "N of", "most of our"), not
+  // merely present anywhere in the sentence. The label set itself is
+  // unchanged; the read is narrower. This does not reach a real tally that
+  // uses vocabulary outside the label set entirely, such as "Requirements
+  // gaps are our biggest cluster this half" (probe P2c) -- that needs the
+  // detector to stop being a label lookup, which is a larger change than
+  // this fixture's build calls for.
+  const isSubjectOrTally = (word, sentence) => {
+    const trimmed = sentence.trim();
+    const subjectRe = new RegExp(
+      `^(?:the |a |an |this |these |those |most(?: of (?:our|the))? |\\d+(?:\\.\\d+)?%? |two |three |four |five |six |seven |eight |nine |ten |eleven |twelve )?${word}s?\\b`, 'i');
+    if (subjectRe.test(trimmed)) return true;
+    const tallyRe = new RegExp(
+      `\\b\\d+(?:\\.\\d+)?%?\\s+(?:of\\s+(?:our|the)\\s+)?${word}\\b|\\b${word}\\b[^.!?]{0,30}\\b\\d+(?:\\.\\d+)?%?\\b|\\bmost of (?:our|the)\\s+${word}\\b`, 'i');
+    return tallyRe.test(trimmed);
+  };
+  // Residual, why this stays reported rather than regaining a "Fixed" label
+  // (2026-09-11 re-verdict B1): the subject branch's leading article is
+  // optional, so "The bug reports cluster into one shape rather than
+  // twelve" still opens with an article immediately before the label and
+  // still matches -- the rule the row names ("subject or tally, not bare
+  // presence") is not what the regex enforces, which is "label within the
+  // first few words, article or not".
+  const firstParagraphSentences = firstParagraph.split(/(?<=[.!?])\s+/);
   let symptomMatch = null;
   for (const label of labels) {
-    if (new RegExp(`\\b${label}\\b`, 'i').test(firstParagraph)) { symptomMatch = label; break; }
+    const hit = firstParagraphSentences.find((s) => new RegExp(`\\b${label}\\b`, 'i').test(s) && isSubjectOrTally(label, s));
+    if (hit) { symptomMatch = label; break; }
     const syn = LABEL_SYNONYMS[label];
-    if (syn && new RegExp(`\\b${syn}\\b`, 'i').test(firstParagraph)) { symptomMatch = `${label} ("${syn}")`; break; }
+    const synHit = syn && firstParagraphSentences.find((s) => new RegExp(`\\b${syn}\\b`, 'i').test(s) && isSubjectOrTally(syn, s));
+    if (synHit) { symptomMatch = `${label} ("${syn}")`; break; }
   }
+  const symptomLabelSet = [...labels].sort();
 
   // rate_observation_as_finding: the other not-a-pass shape ANSWER-KEY.md
   // names ("8 of 12 reopened, QA needs to test earlier") — a reopen-rate
@@ -380,6 +556,13 @@ if (kind === 'theme') {
   // one.
   const landedMechanismHit = landedRanks.some((n) => (key.expected_landed_mechanism ?? []).includes(n));
 
+  // critic_unsupported: "Critic: ran" with no agent transcript discovered
+  // for this session is a claim nothing binds. PREREGISTRATION.md's own row
+  // said "assert together", which is an instruction to a human reader;
+  // subagent_transcripts and critic were emitted as two separate fields with
+  // no conjunction computed between them. One field makes it mechanical.
+  const criticUnsupported = themeCritic === 'ran' && subFiles.length === 0;
+
   // landed_referents_touched: the gate's own touched-file question
   // (touchedFiles, a three-step fallback: uncommitted work, else everything
   // changed since the log was last committed, else the HEAD commit — and it
@@ -391,6 +574,35 @@ if (kind === 'theme') {
   const gateTouchedSet = new Set(gateTouched.length ? [...gateTouched, ...gateUntracked] : []);
   const landedReferentsTouchedGate = expectedReferents.filter((p) => gateTouchedSet.has(p));
 
+  // `reported`: bucket_in_prose, prose-mode member_recall (with
+  // member_recall_mode alongside it), symptom_tally_as_finding (with its
+  // match field) and rate_observation_as_finding, nested rather than flat
+  // (2026-09-11 re-verdict). The comment above symptom_tally_as_finding
+  // names the three probes (B1, B2, B3) that keep these from being verdicts.
+  // Block-derived signals -- bucket, level, member_recall in block mode,
+  // decoys_misfiled, decoys_dismissed, landed_mechanisms and everything
+  // gate-sourced -- read a field or a row region the gate itself validates,
+  // and stay scored at the top level, unaffected.
+  //
+  // member_recall in block mode is the scored top-level field; in prose mode
+  // the number moves here instead of the top level reading a value nothing
+  // has verified.
+  // decoys_misfiled and sum_check_flag come from the same claimed set as
+  // member_recall, so in prose mode they are prose-derived too and move here
+  // with it (second re-verdict, C1). Leaving them scored gave a block-less
+  // narrative a top-level decoys_misfiled of 6 beside a member_recall of null.
+  const proseMode = memberRecallMode === 'prose';
+  const reported = {
+    bucket_in_prose: bucketInProse,
+    member_recall: proseMode ? memberRecall : null,
+    member_recall_mode: memberRecallMode,
+    decoys_misfiled: proseMode ? decoysMisfiled : null,
+    sum_check_flag: proseMode ? sumCheckFlag : null,
+    symptom_tally_as_finding: symptomMatch !== null,
+    symptom_match: symptomMatch,
+    rate_observation_as_finding: rateObservation,
+  };
+
   themeSignals = {
     block_kind: blockKind,
     block_kind_correct: blockKind === key.expected_block,
@@ -398,22 +610,24 @@ if (kind === 'theme') {
     window_count: windowCount,
     window_count_correct: windowCount === key.expected_window_count,
     bucket: themeBucket,
-    bucket_correct: themeBucket === key.expected_bucket,
-    bucket_in_prose: bucketInProse,
+    // null, not false, where there is no block: an absent answer is not a
+    // wrong one, and false read as wrong on every block-less arm.
+    bucket_correct: themeBucket === null ? null : themeBucket === key.expected_bucket,
     level: themeLevel,
-    level_correct: themeLevel === key.expected_level,
-    member_recall: memberRecall,
-    member_recall_mode: memberRecallMode,
-    decoys_misfiled: decoysMisfiled,
-    sum_check_flag: sumCheckFlag,
-    symptom_tally_as_finding: symptomMatch !== null,
-    symptom_match: symptomMatch,
-    rate_observation_as_finding: rateObservation,
+    level_correct: themeLevel === null ? null : themeLevel === key.expected_level,
+    member_recall: proseMode ? null : memberRecall,
+    decoys_misfiled: proseMode ? null : decoysMisfiled,
+    decoys_dismissed: decoysDismissed,
+    sum_check_flag: proseMode ? null : sumCheckFlag,
+    symptom_label_set: symptomLabelSet,
+    reported,
     landed_mechanisms: landedRanks,
     landed_mechanism_hit: landedMechanismHit,
     landed_referents_touched: landedReferentsTouchedGate,
     critic: themeCritic,
+    critic_unsupported: criticUnsupported,
     theme_label: fieldOf(entry, 'Theme') ? labelOf(fieldOf(entry, 'Theme')) : null,
+    entries_in_log: entriesInLog,
     // gate_live: whether the skill fired at all in this arm. A `false` row was
     // never offered to the live gate (the no-skill arm disables the plugin),
     // so its shape says nothing about whether the gate would accept it — a

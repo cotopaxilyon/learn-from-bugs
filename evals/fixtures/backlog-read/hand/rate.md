@@ -1,6 +1,6 @@
 ## 2026-09-11 — Too much reaches QA before it is finished
 
-8 of 12 tickets in this window were reopened after their first close, so the
+9 of 12 tickets in this window were reopened after their first close, so the
 finding is that QA needs to test earlier, before the ticket is marked done
 rather than after.
 

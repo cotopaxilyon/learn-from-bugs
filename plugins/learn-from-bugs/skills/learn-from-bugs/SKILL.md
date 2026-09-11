@@ -123,6 +123,15 @@ Name the gate that should have caught it, and the structural reason it did not:
 | The agent's own verification | If an agent wrote and ran the tests, did they encode the requirement or the implementation? A green suite from the same reader shows the two agree, which is not the same as either being right. |
 | Detection | Did anything tell you (a log, a thrown error, a failed request, a metric), or did a human have to? How long was it live? |
 
+**When 3a names a gate that existed and still did not catch it, stop here.** That
+is the whole answer, the bucket is `none`, and the information layer is not where
+the failure lives. A gate that ran and passed the defect is usually answering a
+cheaper question than the one it was written for: shape where validity was meant,
+presence where usability was meant, the happy path where the class was meant. The
+fix is to that gate, and the finding is what it was really asking. Writing one of
+the four buckets here instead sends the next reader looking for a document that
+was never the problem.
+
 ### 3b. The information layer
 
 When 3a comes back with "there was no gate for this," we go up a layer, and we ask

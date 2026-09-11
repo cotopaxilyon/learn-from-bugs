@@ -313,3 +313,70 @@ Both `theme-*` fixtures were dry-run through `decide()` before the drive, read
 out of the script itself rather than retyped. That found two real defects at no
 cost: the referent check going blind when handed no log path, and the fixture
 shape above. One run per arm, on the same reasoning as run 8.
+
+## Run 10, 2026-09-11, Opus, the theme block and the block-less baseline on convention-spread
+
+Two arms, two runs each, on the convention-spread fixture. Candidate is the
+installed 1.2.2. Baseline is the 1.1.0 copy out of
+`~/.claude/plugins/cache`, dropped into each baseline clone's `.claude/skills/`,
+with the installed plugin disabled for those two runs so only one copy could
+fire. The plan wrote this arm as "candidate versus installed", which stopped
+meaning anything once steps 1 to 4 shipped: the candidate is the installed copy
+now, and the baseline had to be fetched out of the cache to keep the comparison
+the plan described, a baseline that writes no block.
+
+Scored by `evals/score.mjs` against
+`evals/fixtures/convention-spread/ANSWER-KEY.md`. The scorer was run first on
+three hand-written entries and reproduced every value the plan predicted: one
+same-theme date scores 0.33 with `instance_correct` false, all three score 1.0
+and true, and a block-less entry naming all three in prose scores 1.0 with
+`block_present` false.
+
+| Signal | cand-1 | cand-2 | base-1 | base-2 |
+|---|---|---|---|---|
+| fired | installed | installed | candidate | candidate |
+| wrote a new entry | yes | **no** | yes | yes |
+| read the log first | yes | yes | yes | yes |
+| `Instance:` | 4 | void | none | none |
+| `Level:` | contract | void | none | none |
+| `Bucket:` | none | void | none | none |
+| same-theme recall | 1.0 | void | 1.0 | 0 |
+| `Landed:` ranks | 3, 3, 6 | void | none | none |
+| created the expected referent | no | void | no | no |
+| suite green | yes | yes | yes | yes |
+
+**One candidate run wrote no entry at all.** cand-2 fired the skill, completed,
+and left `docs/LESSONS.md` untouched. Every other signal for that arm is about
+the fixture's own newest entry, which is what the scorer read in its place, so
+the column is void rather than null. `entry_is_new` is the only reason this is
+visible: it was added the day before, after a referent signal was found reading
+a file that ships in the bundle. Without it this run would have recorded cand-2
+as a block-carrying entry with 0.33 recall, and the whole column would have been
+fiction.
+
+**The block replicated once out of two, and that is the headline.** cand-1 wrote
+the full block and got the instance arithmetic right. cand-2 wrote nothing. On
+one run out of two the candidate produced no record at all, which is worse than
+the baseline, which wrote an entry both times.
+
+**`block_present` does not measure what its name says.** Both baseline arms score
+true on it. The fixture's own four entries each carry a `Class:` line, so an arm
+copying the house style writes one whatever skill it loaded, and the signal is
+really "a `Class:` or `Theme:` line exists". It answers a cheaper question than
+its name asks, which is the theme of the 2026-09-11 log entry, in the scorer
+written to measure that entry's own release.
+
+**Recall did not separate the arms.** base-1 reached all three priors without a
+block, cand-1 reached all three with one, and base-2 reached none. Two of three
+usable runs found the theme, one from each arm, which is the same null result run
+7 reported on the other fixture.
+
+**Nothing created `src/queue/lookup.js`.** No arm landed the convention-level fix
+the answer key describes; every arm that wrote code guarded in place. On the
+outcome the answer key actually grades, all three usable runs are partial credit.
+
+**cand-1 wrote `Bucket: none` where the key says `unread`.** Worth watching
+rather than concluding from one run: the 3a paragraph teaching `none` shipped the
+day before, and a value that was previously unreachable is now reachable and was
+reached on its first outing.
+

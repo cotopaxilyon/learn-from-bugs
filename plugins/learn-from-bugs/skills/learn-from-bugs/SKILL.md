@@ -123,14 +123,20 @@ Name the gate that should have caught it, and the structural reason it did not:
 | The agent's own verification | If an agent wrote and ran the tests, did they encode the requirement or the implementation? A green suite from the same reader shows the two agree, which is not the same as either being right. |
 | Detection | Did anything tell you (a log, a thrown error, a failed request, a metric), or did a human have to? How long was it live? |
 
-**When 3a names a gate that existed and still did not catch it, stop here.** That
-is the whole answer, the bucket is `none`, and the information layer is not where
-the failure lives. A gate that ran and passed the defect is usually answering a
-cheaper question than the one it was written for: shape where validity was meant,
-presence where usability was meant, the happy path where the class was meant. The
-fix is to that gate, and the finding is what it was really asking. Writing one of
-the four buckets here instead sends the next reader looking for a document that
-was never the problem.
+**When the requirement was written down, a gate was built to check it, and the
+gate passed the defect anyway, stop here.** The bucket is `none`, and the
+information layer is not the next step. A gate that ran and passed is usually
+asking a cheaper question than the one it was written for: shape where validity
+was meant, a request that returned where a request that returned the right rows
+was meant, the happy path where the class was meant. The fix is to that gate, and
+the finding is what it was really asking.
+
+A gate existing is not on its own enough to stop here. When nothing ever said
+what the gate should ask, no gate could have encoded it, and the failure is in
+the information layer however many tests ran: a suite that covered the data but
+not the path, or a QA pass run against the one population that could not
+experience the defect, is 3b's, not `none`. `none` is for the case where the
+requirement reached a gate and the gate let it through.
 
 ### 3b. The information layer
 
@@ -434,7 +440,7 @@ shape, one field per line, after the prose:
 Class: <a label already in this log>          or: Class: new — <the label>; <why no existing label fits>
 Instance: <N>                                 N is 1 + the priors marked same-theme below
 Level: call-site | contract | convention | process
-Bucket: missing | unread | unrecorded | misunderstood | none    from 3b; none = a gate existed and did not fire
+Bucket: missing | unread | unrecorded | misunderstood | none    from 3b; none = a gate ran and passed the defect
 Not one up: <the next level, and why it was rejected>   (omit only at process)
 Sweep: `<command>` → <what it returned>       one line per search, sideways
 Priors: `<command>` → <k nominated>           the backward retrieval

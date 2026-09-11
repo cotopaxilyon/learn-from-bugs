@@ -25,7 +25,17 @@ REF_BUDGET_history_sources=220
 # preamble (cut by half, not dropped, because a row that resolves in no log is
 # the first thing a reader copies wrong). 200 was the cap when the file carried
 # no blocks at all.
-REF_BUDGET_examples=300
+#
+# 300 -> 320 on 2026-09-11, for the worked `none` case. A reviewer's argument for
+# it is the one that moved this: a bucket taught as a rule with no worked case is
+# what sent two readers to two different answers and cost a release. `none` was
+# the last bucket with no case. Twenty-one lines of prose were cut first, all of
+# it restating what a block below it already said, and the cut stopped where it
+# started costing teaching rather than repetition. Considered and refused: cutting
+# the log-entry blockquotes, and dropping the sketch instead of moving the cap.
+# This cap moved on 2026-09-10 as well, which is once too often for comfort; the
+# next increase should be a reason to split the file, not to raise it again.
+REF_BUDGET_examples=320
 fails=0
 
 fail() { printf '  ✗ %s\n' "$1"; fails=$((fails + 1)); }

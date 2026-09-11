@@ -58,14 +58,12 @@ put one.
 **Bucket.** *Missing.* The rule "a call site must not swallow the error it
 catches" was never written down anywhere, so nothing could have flagged it.
 
-**Sweep.** *Sideways:* six other `catch` blocks in the same file; two swallowed
-identically, both fixed in the change. *Backwards:* first of its kind, so the
-block carries no prior rows and the instance number is 1.
+**Sweep.** *Sideways:* two of the six other `catch` blocks in the file swallowed
+identically and were fixed in the change. *Backwards:* first of its kind, so the
+block carries no prior rows and the instance is 1.
 
-**Change landed.** The view model was extracted so it could be imported and
-tested, the call site was made to surface the error instead of swallowing it, and
-a unit test now pins both. Per step 5's table this was a first-of-its-kind, so:
-a test and a log entry, not a new process.
+**Change landed.** A first of its kind, so per step 5's table it bought a test
+and a log entry, not a new process. The block below says what landed.
 
 > A card rendered blank instead of reporting why it couldn't render.
 > *What happened:* a call site caught an error and returned nothing; the card
@@ -107,14 +105,12 @@ nowhere. The second implementation had no way to find it and reasonably invented
 its own.
 
 **Sweep.** *Sideways:* four call sites computed a day from a timestamp; three
-agreed by accident, one didn't. *Backwards:* git nominated two entries. The
-February rounding issue is the same theme, a rule agreed in conversation and
-never written down, so this is instance 2 and the block reuses nothing, because
-that entry carried no label when it was written.
+agreed by accident, one didn't. *Backwards:* the February rounding issue is the
+same theme, so this is instance 2. The block mints a label rather than reusing
+one, because that earlier entry carried none.
 
-**Change landed.** One exported function, every call site routed through it, and
-a test at the boundary, the late-evening case that produced the disagreement.
-Second instance, so per step 5 this earned a check rather than only a test.
+**Change landed.** Second instance, so per step 5 it earned a check rather than
+only a test.
 
 > Two surfaces disagreed about which day a record belonged to.
 > *What happened:* day derivation was implemented twice; the two implementations
@@ -161,19 +157,17 @@ exactly the population that could not experience the bug.
 cached previous version, so there was no criterion to test against.
 
 **The read.** Three issues in six months only affected clients carrying state
-from a previous release, and each had been closed on its own. The `Window:`
-retrieval is what found them, it was run, and the three it returned are the three
-member rows. Who caught each is the part worth writing down: one reached a user,
-one was found by QA on a hunch, one was found by nobody and closed as
-unreproducible. Git also nominated the card entry from March, because this work
-touched a file its commit touched; it is not part of the theme, so the row
-dismisses it rather than leaving the nomination unanswered, and a dismissal does
-not raise `Count:`.
+from a previous release, each closed on its own. The `Window:` retrieval found
+them, it was run, and the three it returned are the member rows. Who caught each
+is the part worth writing down: one reached a user, one QA found on a hunch, one
+nobody found and it was closed unreproducible. Git also nominated the March card
+entry, because this work touched a file its commit touched. It is not part of the
+theme, so the row dismisses it rather than leaving the nomination unanswered, and
+a dismissal does not raise `Count:`.
 
-**Change landed.** Per step 5, a theme buys a process change rather than another
-patch: the QA pass gained a population it has to cover. Each `Landed:` row names
-something this work touched, because a theme entry's whole risk is landing as
-prose about a pattern with nothing to point at.
+**Change landed.** Per step 5 a theme buys a process change rather than another
+patch. Each `Landed:` row names something this work touched, because a theme
+entry's whole risk is landing as prose with nothing to point at.
 
 > Returning clients kept getting a version of the app nobody could reproduce.
 > *What happened:* three issues in six months reached only users carrying state
@@ -222,9 +216,8 @@ unrelated, so this is a first of its kind here. It is the same bucket as #268,
 which is why it earned a check rather than a note, and that stays prose rather
 than a prior row: #268 is in a different log and no row reaches across.
 
-**Change landed.** The content restored, and `scripts/check.sh` now asserts the
-step headings are exactly 1–7 in order, a check that fails loudly if a step is
-ever lost again. The general form: prose cannot guard prose.
+**Change landed.** The content restored, and a check that fails loudly if a step
+is ever lost again. The general form: prose cannot guard prose.
 
 > A capture step disappeared during a refactor and nothing noticed.
 > *What happened:* a documented step was removed as a side effect of moving
@@ -254,10 +247,10 @@ Critic: not-run
 
 ## 5. Illustrative, the buckets with no real instance yet
 
-**Not a real incident.** Included so *unread* and *misunderstood* have a worked
-shape; replace either with a real one the first time it occurs. Both blocks sit
-in no log, so neither carries prior rows, and both are at process level, which is
-the one level that omits `Not one up:`.
+**Not a real incident.** Included so *unread*, *misunderstood* and *none* have a
+worked shape; replace any of them with a real one the first time it occurs. All
+three sit in no log, so none carries prior rows. The first two are at process
+level, which is the one level that omits `Not one up:`.
 
 **Unread.** A ticket's description says a list is sorted alphabetically. Comment
 14, added two days later after a conversation with support, says it should be
@@ -292,5 +285,23 @@ Bucket: misunderstood
 Sweep: `grep -rn 'archived' src/lists` → 4
 Priors: `git log --date=short --format=%ad -- src/lists` → 0 nominated
 Landed: 8 whoever will build it restates the requirement as one concrete scenario with values, confirmed by the author before work starts
+Critic: not-run
+```
+
+**None.** A test asserted that the export endpoint answered `200`. It did, with
+zero rows, because a filter change had emptied the query. The gate is *the
+tests*, and this one ran and passed: it asked whether the call returned where it
+meant whether the call returned the right rows. Nothing in the information layer
+failed here, so the bucket is `none` and the fix is to the assertion.
+
+```
+Class: new — a check that asserts the call succeeded where it meant the result was right; no existing label names an assertion that passes on any response at all
+Instance: 1
+Level: contract
+Bucket: none
+Not one up: convention would be a rule for every assertion in the suite, and one test asserting the wrong thing is not evidence that the convention is wrong
+Sweep: `grep -rn 'status).toBe(200)' test` → 5
+Priors: `git log --date=short --format=%ad -- test/export` → 0 nominated
+Landed: 2 the export test asserts the rows it expects rather than that the call returned, red: it failed against the empty export before the query was fixed, test/export/rows.test.js
 Critic: not-run
 ```

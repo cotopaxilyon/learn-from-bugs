@@ -444,6 +444,27 @@ test('backlog-read: critic_unsupported and entries_in_log', () => {
 // allows, so a later edit adding a third ticket to one symptom cannot
 // silently make a symptom tally a valid answer without this test catching it
 // first.
+// The bundle an arm clones and the files this suite reads are built from the
+// same tree by build-bundle.sh; this holds them to it, so an edit to either
+// without a rebuild is a red here rather than a fixture that quietly differs
+// from its own test. The clone also proves the README's restore command.
+test('backlog-read.bundle clones to exactly the tracked tickets.jsonl and docs/', () => {
+  const bundle = path.join(FIXTURE, 'backlog-read.bundle');
+  assert.ok(fs.existsSync(bundle), 'backlog-read.bundle is missing; run evals/fixtures/backlog-read/build-bundle.sh');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backlog-read-clone-'));
+  execFileSync('git', ['clone', '-q', bundle, path.join(dir, 'work')], { encoding: 'utf8' });
+  const work = path.join(dir, 'work');
+  const shipped = execFileSync('git', ['-C', work, 'ls-files'], { encoding: 'utf8' }).trim().split('\n').sort();
+  const expected = ['tickets.jsonl', ...fs.readdirSync(path.join(FIXTURE, 'docs')).map((f) => `docs/${f}`)].sort();
+  assert.deepEqual(shipped, expected);
+  for (const f of shipped) {
+    assert.equal(fs.readFileSync(path.join(work, f), 'utf8'), fs.readFileSync(path.join(FIXTURE, f), 'utf8'), `${f} in the bundle differs from the tracked file`);
+  }
+  const day = execFileSync('git', ['-C', work, 'log', '--date=short', '--format=%ad'], { encoding: 'utf8' }).trim();
+  assert.equal(day, '2026-08-10', 'the bundle has one commit, dated to the log header');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('no label in tickets.jsonl groups more tickets than expected_symptom_themes_max_size allows', () => {
   const keyText = fs.readFileSync(ANSWER_KEY, 'utf8');
   const key = JSON.parse(keyText.match(/```json\n([\s\S]*?)```/)[1]);

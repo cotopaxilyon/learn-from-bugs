@@ -9,6 +9,16 @@ missing. Each answered a cheaper question than the rule it stood for asked,
 which is the one property they share and the reason a passing run kept reading
 as evidence.
 
+**Name the set the check ranges over before you write it**, then ask what takes a
+member out of that set without taking the defect with it. A check that finds its
+subjects by a distinguishing feature inherits that feature as an escape hatch: a
+block recognised by its first line leaves the set when a blank line is added
+above it, and a release recognised by its cached files leaves the set when
+something else caches them. Watch the check red on *that*, not only on the defect
+you have in hand. Six of the entries in this project's log are checks that were
+watched red on a case the author had in mind, against a set the author never
+named.
+
 **Run the new check against the defect and watch it go red.** A check never
 observed failing is a hypothesis about a check. This is not the same artifact as
 step 1's failing test: that one reproduces the bug, this one is the thing you

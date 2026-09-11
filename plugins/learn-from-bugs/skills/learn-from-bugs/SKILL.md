@@ -549,12 +549,15 @@ the cause ("A missing empty state made the dashboard look broken on day one" bea
 "Empty state not handled"), because people scan the log for a symptom they are
 seeing.
 
-Tag the issue with its theme before closing it. This is the cheapest step here and
-the one that makes every future analysis possible, since a theme nobody labeled is
-a pattern nobody will see, and step 4's backward sweep is only as good as the
-labels the last six months left behind. One consistent label per issue (`a11y`,
-`empty-state`, `timezone`, `spec-ambiguity`) beats an elaborate taxonomy nobody
-applies.
+Tag the issue with two labels before closing it, one per axis: the class, copied
+from the entry's `Class:` label rather than judged again, and the bucket, copied
+from its `Bucket:` line. This is the cheapest step here and the one that makes
+every future analysis possible, since a theme nobody labeled is a pattern nobody
+will see, and step 4's backward sweep is only as good as the labels the last six
+months left behind. Two labels rather than one because they answer different
+questions: a symptom label finds nine accessibility tickets, and only a bucket
+label finds nine tickets whose requirement sat in a comment, which is the finding
+the periodic read exists for.
 
 If your project has no incident log, that is the step-5 finding. Start it with
 this issue.
@@ -606,15 +609,30 @@ fix, the gate, the assumption, the sweep, and the change.
 `references/do-not.md` is the compressed form of everything above, so the ways
 this analysis gets quietly skipped. Read it before calling the issue done.
 
+## Reading from outside
+
+When the reader is not on the team that owns the code, the way a QA partner
+reading a client's tracker is, steps 1, 3, 4, 6, 7, 8 and the periodic read are
+the reader's to run. Steps 2 and 5 belong to the team that owns the code, and
+from outside they become a proposal rather than a change: name the fix, do not
+claim to have landed one. Step 8 stays with the reader, since re-verifying
+against the build that shipped and sending back the five-part comment is what
+an outside reader is there for. The `Landed:` rows of that entry carry the
+proposal's ticket id,
+which the gate accepts in place of a path, and the entry should never claim a
+change the reader did not make.
+
 ## The periodic read, running this without a specific bug
 
 The other way to run this is over a window (the last month of closed issues, a
 release's QA findings, a support queue) on a cadence rather than only when
 something hurts, because no single ticket in the pile would ever trigger it. Tally
 by theme rather than severity and pick one upstream change, with the issue count
-as its argument. It ends in a log entry like any other run of this, using the
-theme block in step 6 rather than the incident one. Procedure in
-`references/backlog-read.md`, retrieval in `references/history-sources.md`.
+as its argument; `references/bucket-signals.md` reads each bucket off a tracker
+export, for a tally by bucket instead of by theme. It ends in a log entry like any
+other run of this, using the theme block in step 6 rather than the incident one.
+Procedure in `references/backlog-read.md`, retrieval in
+`references/history-sources.md`.
 
 ## When nothing could have caught it
 

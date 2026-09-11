@@ -14,7 +14,29 @@ REF_BUDGET=200
 # check below enforces. So it is structurally the largest reference and grows with
 # each source the ecosystem adds. A uniform cap across files with different jobs was the wrong shape; this
 # is a stated exception, not a cap raised on contact. Everything else stays at 200.
-REF_BUDGET_history_sources=220
+REF_BUDGET_history_sources=226
+# 220 -> 226 on 2026-09-11, set to the file's own length after a fresh-context
+# review found the first version of this comment misdescribed the App Store cut
+# (the review's Finding 5) and that a cap above the file spends the next
+# raise-comment in advance. Corrected account: the per-issue retrieval ask
+# (comments with timestamps and author role, description revision history,
+# reopen and works-as-designed transitions) lives once, in its own paragraph in
+# bucket-signals.md, not restated in either tracker section here; each tracker
+# section points at bucket-signals.md for it, and the GitHub one also keeps
+# `gh issue view --comments` plus the no-description-edit-history note. The App Store section's
+# rating-step-change qualifiers (noisier than error monitoring, measured in
+# days to weeks) and its cross-reference to the environment-specific lens were
+# NOT cut; both are present, restored after the review caught their loss. What
+# was actually cut, and stays cut: the App Store section's five paragraphs to
+# three, the GitHub --json and fidelity paragraphs merged into one, and a
+# sentence each tightened in the Day one, error-monitoring, product-analytics,
+# support-tools, spreadsheet, and team-chat paragraphs. That lands the file at
+# 226 with the shared ask moved out to bucket-signals.md, both sections
+# pointing at it, and the App Store qualifiers restored. Considered and refused: cutting the App Store
+# section further, which now would cost the rating-step-change signal or the
+# emotional-register rule outright rather than just their phrasing; and
+# cutting the Claude Code conversation source section, the one place the
+# agent-authored-fix blind spot is named at all.
 # examples.md carries the worked output rather than describing it, so every one
 # of its five sections ends in a step 6 block and the theme example carries a
 # second kind. Six blocks are about 80 lines that cannot be paraphrased: a block

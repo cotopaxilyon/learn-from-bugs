@@ -11,10 +11,25 @@ point is that no single ticket in the pile would have triggered it.
 Retrieval is in `history-sources.md`, which covers which source, which command,
 and what fidelity each one carries. Gather first, then:
 
-1. **Tally by theme.** Group the window by what each issue was about, rather than
-   by severity or component. Accessibility. Empty and error states. Timezones.
-   Permissions. Copy. Mobile layout. Anything with more than a couple of entries
-   is a candidate.
+1. **Tally twice, by theme and by bucket.** First group the window by what each
+   issue was about, so accessibility, empty and error states, timezones,
+   permissions, copy, mobile layout. Anything with more than a couple of entries
+   is a candidate. Then group the same window again by which of the 3b buckets
+   each issue fell into, missing, unread, unrecorded, misunderstood, or none,
+   reading the bucket off the tracker signals in `bucket-signals.md` rather than
+   off memory, and confirm a sample of each cluster by hand before it enters the
+   entry. The two tallies find different things. Nine tickets whose
+   requirement sat in a late comment have nine different symptoms, so the first
+   tally splits them nine ways and the finding that comments go unread never
+   surfaces; only the second tally can see it. A cluster in either tally is a
+   candidate, and a cluster that appears in both is the one to pick in step 5.
+   Each theme is stated as a count over the window's total, and the read names
+   the test scope that produced the window, since a theme matching that scope
+   is evidence about the audit until it is checked against a window the audit
+   did not produce. Cluster the whole window before naming anything. Write the
+   residue that fits no cluster into the entry as a count beside the theme's
+   own, and where the prompt named a theme in advance, write that theme's share
+   and its rank among the clusters rather than a sentence confirming it.
 2. **Ask what each cluster says about the process rather than the code.** A
    cluster means the work reliably reaches QA without that concern having been
    considered, so where would it have been considered? Usually a phase that does

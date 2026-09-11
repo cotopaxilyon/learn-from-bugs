@@ -158,9 +158,9 @@ only arrives if you labelled the earlier ones.
 `SKILL.md` holds the eight steps and the information layer. The conditional
 material sits in `references/` and loads only when it applies: `intake.md`,
 `agent-and-context.md`, `classes.md`, `history-sources.md`, `backlog-read.md`,
-`land-a-change.md`, `checks-that-cannot-fail.md`, `critic-pass.md`, `do-not.md`,
-and `examples.md`, which runs five issues end to end, block included, so the
-output shape is visible rather than described.
+`bucket-signals.md`, `land-a-change.md`, `checks-that-cannot-fail.md`,
+`critic-pass.md`, `do-not.md`, and `examples.md`, which runs five issues end
+to end, block included, so the output shape is visible rather than described.
 
 That split is the skill taking its own advice. A rule buried on page four of a
 long file fails the same way a requirement buried in comment #14 does.

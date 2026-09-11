@@ -58,3 +58,46 @@ this fixture would grade the wrong thing.
   theme.
 - Six recorded rules were false at HEAD in the first build. They were made true
   and landed in a catch-up commit dated 2026-08-26.
+
+## Machine-checkable answer
+
+```json
+{
+  "expected_same_theme": [
+    "2026-02-09 The activity heading read",
+    "2026-04-02 The CSV export returned a 500",
+    "2026-06-11 A malformed timestamp put rows"
+  ],
+  "expected_instance": 4,
+  "expected_level": "convention",
+  "expected_landed_referents": ["test/dates.test.js"],
+  "expected_bucket": "none"
+}
+```
+
+Each `expected_same_theme` entry is a heading date plus a fragment of that
+entry's heading, the key a `Priors:` row uses. All three dates are unique in this
+log, so the fragments are for readability rather than for resolution. `score.mjs`
+reads the date half for recall, because an arm that writes no block still writes
+dates and has to be scored on the same footing.
+
+`expected_landed_referents` names the museum list, which is where a
+convention-level fix lands: the list of malformed inputs stops being hand-written
+history. The round trip in `src/dates.js` is not named here because the scorer
+already reports it separately as `roundtrip_present`, and naming it twice would
+let one change satisfy two signals.
+
+**`expected_bucket` is `none`.** The plan's §4 example wrote `unrecorded`, and
+that does not survive reading the fixture. `docs/CONVENTIONS.md` carries the rule
+that produced the museum list ("Malformed and corrupt inputs are kept in a
+separate list and tested as pass-through"), so the information was recorded, and
+the 2026-06-11 entry records the shape rule as well. It was not missing, it was
+read, and it is not ambiguous. A guard existed, ran, and passed the input,
+because it asked whether the string looked like a date rather than whether it was
+one.
+
+That is now the case SKILL.md 3a names in as many words, "shape where validity
+was meant", so this value is read off the doctrine rather than argued from the
+fixture. It was not readable that way when this key was first drafted: `none` was
+a closed-set value the gate enforced and the skill taught nowhere, which is why
+the plan and this key first disagreed about it.

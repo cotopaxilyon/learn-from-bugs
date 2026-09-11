@@ -19,10 +19,13 @@ period.
 artificialities that are known and disclosed. Keep it out of any directory an arm
 runs in.
 
-Scored with `evals/score.mjs <arm-dir> <transcript.jsonl>`, which reports twelve
-mechanical signals and no judgement. It reads subagent transcripts as well as the
-parent, because a tool call made inside a spawned agent never appears in the
-parent stream.
+Scored with `evals/score.mjs <arm-dir> <transcript.jsonl> ANSWER-KEY.md`, which
+reports mechanical signals and no judgement. The answer key is required: the
+expected priors, instance, level, bucket and referents are read from its `json`
+block rather than held in the scorer, which used to carry one fixture's three
+dates as a constant and scored the other fixture a confident zero. It reads
+subagent transcripts as well as the parent, because a tool call made inside a
+spawned agent never appears in the parent stream.
 
 Reviewed by a fresh-context critic on 2026-09-02. Five findings, two of which
 changed the fixture. Raw run transcripts were not kept: 2.5M for four runs, and

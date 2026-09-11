@@ -1172,6 +1172,68 @@ test('where git cannot answer the backward sweep, the gate says so instead of pe
   assert.ok(!codes(decide(write(healthy, LOG + '\n' + GOOD))).includes('deny_nomination_unverifiable'));
 });
 
+// 2026-09-11, probe run this session (scratchpad probe-tracker-theme.mjs). A
+// theme entry with no file referent at all -- Window a grep over an exported
+// ticket file, member rows ticket ids, and the Landed row's own referent a
+// ticket id too -- has no git nomination to answer for and no touched file to
+// check, so nothing here pinned which git states let this shape through.
+// decide() allows it where HEAD exists and the backward sweep nominates
+// nothing, and refuses it with deny_nomination_unverifiable and nothing else
+// where HEAD does not exist: a repo with no commits, and no repo at all. A
+// HEAD-bearing repo that does nominate refuses this shape for
+// deny_theme_ignores_nomination, because ticket-id member rows answer no
+// nomination; that rule is pinned at the "must answer for every nominated
+// prior" test above.
+test('a tracker-only theme entry is allowed where git has a HEAD and nominates nothing, and refused where git has no HEAD', () => {
+  const seedTickets = (dir) => fs.writeFileSync(
+    path.join(dir, 'tickets.txt'),
+    'INV-101 list sorted wrong\nINV-102 archive hidden\nINV-103 keyboard trap\n',
+  );
+  const entry = LOG + '\n' + [
+    '## 2026-09-11 — Requirements added in comments were built past three times',
+    '',
+    'Three tickets carried a product comment adding a requirement after the',
+    'description was written, and each was built to the description.',
+    '',
+    'Theme: new — a requirement that arrived somewhere nobody reads twice; no existing label names it',
+    "Window: `grep INV tickets.txt` → 3 items",
+    'Count: 3',
+    '- INV-101: qa',
+    '- INV-102: user',
+    '- INV-103: qa',
+    'Bucket: unread',
+    'Landed: 6 a requirement added in a comment is promoted into the description before pickup, INV-200',
+    'Critic: not-run',
+    '',
+  ].join('\n');
+
+  const committed = repo();
+  seedTickets(committed);
+  const allowed = decide(write(committed, entry));
+  assert.equal(allowed, null, JSON.stringify(codes(allowed)));
+
+  const noCommit = fs.mkdtempSync(path.join(os.tmpdir(), 'lfb-tracker-nocommit-'));
+  fs.mkdirSync(path.join(noCommit, 'docs'));
+  fs.writeFileSync(path.join(noCommit, 'docs/LESSONS.md'), LOG);
+  seedTickets(noCommit);
+  execFileSync('git', ['init', '-q'], { cwd: noCommit, stdio: ['ignore', 'pipe', 'ignore'] });
+  assert.deepEqual(codes(decide(write(noCommit, entry))), ['deny_nomination_unverifiable']);
+
+  const noRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'lfb-tracker-norepo-'));
+  fs.mkdirSync(path.join(noRepo, 'docs'));
+  fs.writeFileSync(path.join(noRepo, 'docs/LESSONS.md'), LOG);
+  seedTickets(noRepo);
+  assert.deepEqual(codes(decide(write(noRepo, entry))), ['deny_nomination_unverifiable']);
+
+  // A HEAD-bearing repo where git does nominate is neither of the above two
+  // states: the backward sweep has a prior to answer for, the theme's member
+  // rows are all ticket ids, and no member row answers that prior, so this is
+  // refused for a different reason than the no-HEAD states are.
+  const nominating = repo({ touch: ['src/dates.js'], backdate: { 'src/dates.js': ['2026-06-11'] } });
+  seedTickets(nominating);
+  assert.deepEqual(codes(decide(write(nominating, entry))), ['deny_theme_ignores_nomination']);
+});
+
 // 2026-09-10. Nothing here had ever put cwd below the repo root, and the hook
 // takes whatever directory the session runs in. From a subdirectory the two
 // halves of the touched set disagree: `git diff --name-only` names files from
@@ -1415,18 +1477,59 @@ test('uniq refuses a second file but not a flag value that looks like one', () =
 
 // The commands this log actually uses, and the ones its references recommend. A
 // refusal rule is only worth having if the corpus it governs still passes it.
+//
+// 2026-09-11. The reference half of this used to be a hardcoded four-element
+// array while the references it stood in for grew past that: step 1 added
+// `gh issue view N --comments` to history-sources.md and four grep/sort/git
+// forms to the new bucket-signals.md, ten recommended commands total, and the
+// array here never grew. So this test kept passing while checking a narrower
+// corpus than the one it claimed to cover -- a check that could not have
+// caught the gap it exists for. Derive the reference corpus from the files
+// themselves instead: every inline backtick span, and every line inside a
+// ``` fence, whose first token names a key of ALLOWED. Placeholder forms such
+// as `gh issue view N --comments` and bare `grep -c` are part of that corpus
+// on purpose and must vet clean; a refusal there is an escalation, not
+// something to filter out.
+function referenceCommandCorpus() {
+  const dir = new URL('../skills/learn-from-bugs/references/', import.meta.url);
+  const isAllowed = (tok) => Object.prototype.hasOwnProperty.call(ALLOWED, tok);
+  const found = [];
+  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+    const text = fs.readFileSync(new URL(name, dir), 'utf8');
+    for (const m of text.matchAll(/`([^`\n]+)`/g)) {
+      const cmd = m[1].trim();
+      if (isAllowed(cmd.split(/\s+/)[0])) found.push({ file: name, cmd });
+    }
+    for (const fence of text.matchAll(/```[^\n]*\n([\s\S]*?)```/g)) {
+      for (const line of fence[1].split('\n')) {
+        const cmd = line.trim();
+        if (cmd && isAllowed(cmd.split(/\s+/)[0])) found.push({ file: name, cmd });
+      }
+    }
+  }
+  return found;
+}
+
 test('every command the log already uses still vets', () => {
   const log = fs.readFileSync(new URL('../../../docs/LESSONS.md', import.meta.url), 'utf8');
   const cmds = [...log.matchAll(/^(?:Sweep|Priors|Window):[ \t]*`([^`]+)`/gm)].map((m) => m[1]);
   assert.ok(cmds.length >= 10, `expected the log's own corpus, found ${cmds.length}`);
   for (const cmd of cmds) assert.equal(vetCommand(cmd), null, `the log already uses "${cmd}" and it is now refused: ${vetCommand(cmd)}`);
-  for (const cmd of [
-    'gh issue list --state closed --limit 200 --json number,title,labels,closedAt',
-    'gh pr list --state merged --limit 200 --json number,title,body,mergedAt',
-    'git log --oneline --since="3 months ago"',
-    'git log --since="3 months ago" --format="%h %s%n%b" | grep -i "fix\\|bug\\|broken"',
-  ]) {
-    assert.equal(vetCommand(cmd), null, `history-sources.md recommends "${cmd}" and it is refused: ${vetCommand(cmd)}`);
+
+  const refCorpus = referenceCommandCorpus();
+  // The filter selects on ALLOWED, which is also what vetCommand refuses on, so
+  // a binary leaving ALLOWED drops its commands out of the corpus rather than
+  // failing them: `delete ALLOWED.gh` left this green while the hardcoded array
+  // it replaced went red on two. Pin the set so a removal is a red here and a
+  // deliberate edit there.
+  assert.deepEqual(
+    [...new Set(refCorpus.map(({ cmd }) => cmd.split(/\s+/)[0]))].sort(),
+    ['gh', 'git', 'grep', 'sort'],
+    'a binary the references recommend stopped being one the gate will run',
+  );
+  assert.ok(refCorpus.length >= 10, `expected the references' own corpus, found ${refCorpus.length}`);
+  for (const { file, cmd } of refCorpus) {
+    assert.equal(vetCommand(cmd), null, `${file} recommends "${cmd}" and it is refused: ${vetCommand(cmd)}`);
   }
 });
 

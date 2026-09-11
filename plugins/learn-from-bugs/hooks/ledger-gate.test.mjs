@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { decide, validateEntry, nominate, newEntries, vetCommand, observationMatches, touchedFiles, untrackedFiles, ticketPattern, mintShapeFault, gitReachable, gitHasHistory, repoRoot, requireCwd, logNameFrom, runCommand, ALLOWED } from './ledger-gate.mjs';
+import { decide, validateEntry, nominate, newEntries, vetCommand, observationMatches, touchedFiles, untrackedFiles, ticketPattern, mintShapeFault, gitReachable, gitHasHistory, repoRoot, requireCwd, logNameFrom, runCommand, ALLOWED, themeMemberRows, fieldOf, splitSearchLine } from './ledger-gate.mjs';
 
 const LOG = `# Lessons
 
@@ -1636,4 +1636,28 @@ test('the read-only spellings of the same commands still pass', () => {
       assert.equal(vetCommand(cmd), null, `${name}: "${cmd}" is read-only and was refused: ${vetCommand(cmd)}`);
     }
   }
+});
+
+// The plan's rule against a second copy binds only if a reader outside this
+// module can reach the parse it would otherwise restate. themeMemberRows and
+// fieldOf are the two pieces evals/score.mjs now calls instead of mirroring;
+// splitSearchLine already existed and only needed the export keyword. One test
+// covers both that the three exist and that the row parser reads a real block
+// correctly, rather than splitting a single claim across two runs.
+test('themeMemberRows, fieldOf and splitSearchLine are exported, and themeMemberRows reads examples.md\'s theme block as its four rows', () => {
+  assert.equal(typeof themeMemberRows, 'function', 'themeMemberRows is not exported');
+  assert.equal(typeof fieldOf, 'function', 'fieldOf is not exported');
+  assert.equal(typeof splitSearchLine, 'function', 'splitSearchLine is not exported');
+
+  const examples = fs.readFileSync(
+    path.join(import.meta.dirname, '..', 'skills', 'learn-from-bugs', 'references', 'examples.md'),
+    'utf8',
+  );
+  const block = examples.match(/```\nTheme: new — failures only a returning client[\s\S]*?```/);
+  assert.ok(block, 'examples.md no longer carries the returning-client theme block this test reads');
+  const body = block[0].replace(/^```\n/, '').replace(/```$/, '');
+  const { rows } = themeMemberRows(body);
+  assert.equal(rows.length, 4, `expected 4 member rows, got ${rows.length}`);
+  assert.deepEqual(rows.map((r) => r.key), ['#231', '#244', '#252', '2026-03-04 A card rendered blank']);
+  assert.deepEqual(rows.map((r) => r.caught), ['nobody', 'qa', 'user', 'not-a-member']);
 });

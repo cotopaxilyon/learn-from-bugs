@@ -415,9 +415,9 @@ echo "== the unit suites run =="
 # executes is a check that cannot fail, which is the 2026-09-01 entry. The suites
 # are wired here so CI runs them.
 if command -v node >/dev/null 2>&1; then
-  if node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs >/dev/null 2>&1
-  then pass "ledger-gate, gate-existing-entries and check-examples suites"
-  else fail "unit suites failed; run: node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs"; fi
+  if node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs evals/score.test.mjs >/dev/null 2>&1
+  then pass "ledger-gate, gate-existing-entries, check-examples and score suites"
+  else fail "unit suites failed; run: node --test plugins/learn-from-bugs/hooks/ledger-gate.test.mjs scripts/gate-existing-entries.test.mjs scripts/check-examples.test.mjs evals/score.test.mjs"; fi
 else
   fail "node is not on PATH, so the unit suites did not run"
 fi

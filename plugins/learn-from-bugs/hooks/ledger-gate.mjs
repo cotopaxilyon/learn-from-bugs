@@ -404,7 +404,7 @@ export function observationMatches(observation, out) {
   return false;
 }
 
-function splitSearchLine(v) {
+export function splitSearchLine(v) {
   const m = v.match(/^`([^`]+)`\s*(?:→|->|=>)?\s*(.*)$/);
   return m ? { cmd: m[1].trim(), observation: m[2].trim() } : null;
 }
@@ -466,6 +466,26 @@ function landedRows({ body, fails, cwd, env, logPath, requireReferent }) {
   }
 }
 
+// The theme block's member-row region and its parsed rows: the rows sit in one
+// place by definition, between the header fields (Count/Window/Theme) and
+// Bucket:/Landed:/Critic:, so that is where they are read from. Falling back to
+// the whole body when the anchor is missing keeps a block with no Count: from
+// losing its rows as well as its count. Exported so the gate and a reader
+// grading a theme entry (evals/score.mjs) share one parse rather than each
+// keeping its own copy of the anchor/close logic.
+export function themeMemberRows(body) {
+  const bodyLines = body.split('\n');
+  const anchor = bodyLines.findIndex((l) => /^(Count|Window|Theme):/.test(l.trim()));
+  const closes = bodyLines.findIndex((l, i) => i > anchor && /^(Bucket|Landed|Critic):/.test(l.trim()));
+  const region = anchor === -1 ? bodyLines : bodyLines.slice(anchor + 1, closes === -1 ? bodyLines.length : closes);
+  const rows = region
+    .map((l) => l.trim())
+    .map((l) => ({ l, m: l.match(/^- (.+?):[ \t]*([a-z-]+)$/) }))
+    .filter(({ m }) => m)
+    .map(({ l, m }) => ({ key: m[1].trim(), caught: m[2], raw: l }));
+  return { bodyLines, anchor, closes, region, rows };
+}
+
 // A theme entry records a recurring pattern across incidents, so it has no
 // single fix diff and git cannot nominate for it. Its members are named by the
 // author and bound to an executed retrieval instead: the Window runs, its line
@@ -491,19 +511,9 @@ function validateThemeEntry({ body, field, need, fails, onDisk, nominated, cwd, 
 
   const headings = headingsIn(onDisk);
   // The scan used to read the whole body, so a prose bullet anywhere above the
-  // block was claimed as a member row. The rows sit in one place by definition,
-  // between the header fields and Bucket:, so that is where they are read from.
-  // Falling back to the whole body when the anchor is missing keeps a block with
-  // no Count: from losing its rows as well as its count.
-  const bodyLines = body.split('\n');
-  const anchor = bodyLines.findIndex((l) => /^(Count|Window|Theme):/.test(l.trim()));
-  const closes = bodyLines.findIndex((l, i) => i > anchor && /^(Bucket|Landed|Critic):/.test(l.trim()));
-  const rowRegion = anchor === -1 ? bodyLines : bodyLines.slice(anchor + 1, closes === -1 ? bodyLines.length : closes);
-  const memberLines = rowRegion
-    .map((l) => l.trim())
-    .map((l) => ({ l, m: l.match(/^- (.+?):[ \t]*([a-z-]+)$/) }))
-    .filter(({ m }) => m)
-    .map(({ l, m }) => ({ key: m[1].trim(), caught: m[2], raw: l }));
+  // block was claimed as a member row. themeMemberRows is the single copy of
+  // where the rows sit and how they parse.
+  const { bodyLines, region: rowRegion, rows: memberLines } = themeMemberRows(body);
   // A row that misses the shape used to be dropped without a word, and surfaced
   // later as a Count mismatch naming the wrong problem. Same treatment the issue
   // block gives a malformed prior row: any bullet in the rows region is either a
@@ -635,6 +645,18 @@ function validateThemeEntry({ body, field, need, fails, onDisk, nominated, cwd, 
   return fails;
 }
 
+// A field is read body-wide, not block-wide: the gate places no requirement on
+// field order, so `need('Bucket')` and `need('Level')` have to find the line
+// wherever it sits in the entry. Exported so a reader grading an entry (evals/
+// score.mjs) reads fields the same way the gate accepts them, rather than
+// scoping its own read to a slice of the body and disagreeing with the gate on
+// a placement the gate blesses.
+export function fieldOf(body, name) {
+  // [ \t]* rather than \s*: a bare "Field:" must not capture the next line.
+  const m = body.match(new RegExp(`^${name}:[ \\t]*(.*)$`, 'm'));
+  return m ? m[1].trim() : null;
+}
+
 export function validateEntry(entry, { onDisk, nominated, cwd, env = process.env, logPath = null }) {
   // A caller with a cwd and no logPath used to get a different check rather than
   // an error: touchedFiles fell back to HEAD, so the touched set was whatever
@@ -657,11 +679,7 @@ export function validateEntry(entry, { onDisk, nominated, cwd, env = process.env
   }
   const fails = [];
   const body = entry.body;
-  const field = (name) => {
-    // [ \t]* rather than \s*: a bare "Field:" must not capture the next line.
-    const m = body.match(new RegExp(`^${name}:[ \\t]*(.*)$`, 'm'));
-    return m ? m[1].trim() : null;
-  };
+  const field = (name) => fieldOf(body, name);
   const need = (name) => {
     const v = field(name);
     if (v === null || v === '') fails.push({ code: 'deny_missing_field', detail: `${name}:` });

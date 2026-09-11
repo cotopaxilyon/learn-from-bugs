@@ -17,6 +17,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
+import {
+  entriesIn, labelOf, BUCKETS, LEVELS, MEMBER_DISPOSITIONS, NOT_A_MEMBER,
+  ticketPattern, runCommand, vetCommand, themeMemberRows, fieldOf, splitSearchLine,
+  touchedFiles, untrackedFiles,
+} from '../plugins/learn-from-bugs/hooks/ledger-gate.mjs';
 
 const [armDir, transcript, answerKey] = process.argv.slice(2);
 if (!armDir || !transcript || !answerKey) {
@@ -31,13 +36,32 @@ if (!keyBlock) {
   process.exit(2);
 }
 const key = JSON.parse(keyBlock[1]);
-for (const f of ['expected_same_theme', 'expected_instance', 'expected_level', 'expected_bucket']) {
+// A theme-block fixture (a periodic read across incidents) has member rows and
+// a Window: line, not prior rows and an instance, so it cannot carry
+// expected_same_theme/expected_instance and is graded on a different required
+// set. `kind` is read from the key itself; absent or anything but "theme"
+// means the original incident shape, unchanged.
+const kind = key.kind === 'theme' ? 'theme' : 'incident';
+const REQUIRED_FIELDS = kind === 'theme'
+  ? ['expected_bucket', 'expected_bucket_members', 'expected_decoys', 'expected_window_count', 'expected_block', 'expected_level']
+  : ['expected_same_theme', 'expected_instance', 'expected_level', 'expected_bucket'];
+for (const f of REQUIRED_FIELDS) {
   if (key[f] === undefined) { console.error(`${answerKey}: the json block has no ${f}`); process.exit(2); }
+}
+if (kind === 'theme') {
+  if (!BUCKETS.includes(key.expected_bucket)) {
+    console.error(`${answerKey}: expected_bucket "${key.expected_bucket}" is not one of ${BUCKETS.join(', ')}`);
+    process.exit(2);
+  }
+  if (!LEVELS.includes(key.expected_level)) {
+    console.error(`${answerKey}: expected_level "${key.expected_level}" is not one of ${LEVELS.join(', ')}`);
+    process.exit(2);
+  }
 }
 // A key row is "YYYY-MM-DD <fragment>". The date is the half an arm without a
 // block still writes, so recall reads that; the fragment is what makes the row
 // resolve to one entry rather than to a day, and it is kept for the report.
-const expected = key.expected_same_theme.map((row) => {
+const expected = (key.expected_same_theme ?? []).map((row) => {
   const m = String(row).match(/^(\d{4}-\d{2}-\d{2})\s*(.*)$/);
   if (!m) { console.error(`${answerKey}: "${row}" is not "YYYY-MM-DD <heading fragment>"`); process.exit(2); }
   return { date: m[1], fragment: m[2].trim(), row: String(row) };
@@ -125,6 +149,18 @@ if (entryHeading) {
     entryIsNew = !shipped.includes(entryHeading);
   } catch { entryIsNew = null; }
 }
+// Theme fixtures only: re-isolate the entry with the gate's own heading
+// grammar (entriesIn) rather than the loose `^## ` scan above, since a theme
+// answer key is new to this scorer and there is no existing behaviour on this
+// path to preserve. Incident fixtures never take this branch, so entry and
+// entryHeading are untouched for them.
+if (kind === 'theme' && fs.existsSync(logPath)) {
+  const gateEntries = entriesIn(fs.readFileSync(logPath, 'utf8'));
+  if (gateEntries.length > 0) {
+    entry = gateEntries[0].body;
+    entryHeading = `${gateEntries[0].date} — ${gateEntries[0].title}`;
+  }
+}
 
 // 5. the block, if there is one
 const blockStart = entry.match(/^(?:Class|Theme):[ \t]*.*$/m);
@@ -202,7 +238,202 @@ const landedRanks = block
   ? [...block.matchAll(/^Landed:[ \t]*(\d{1,2})\b/gm)].map((m) => Number(m[1]))
   : [];
 
-console.log(JSON.stringify({
+// 8. theme-block signals. Only computed, and only added to the output, when
+// the answer key says kind: "theme" — an incident-kind run (the default)
+// takes none of this, so its key set and its values are unchanged. Fields are
+// read body-wide via the gate's own `fieldOf` export, the same way the gate
+// itself reads them (it places no requirement on field order), rather than
+// through the `field()` closure above, which is scoped to `block` and
+// disagrees with the gate on a placement the gate accepts — see the
+// backlog-read review, F2. Member rows and the Window/Sweep arrow grammar
+// likewise come from the gate's exports (`themeMemberRows`, `splitSearchLine`)
+// rather than a second copy of either (review F5).
+let themeSignals = {};
+if (kind === 'theme') {
+  // block_kind: theme | incident | none. A `Theme:` word in prose is not a
+  // theme block; the line has to sit at column 0 (the same anchor `fieldOf`
+  // itself reads fields from) and a `Window:` line has to follow it, or the
+  // signal would fire on the no-skill arm's narrative rather than on the
+  // block the skill writes. Mirrors `validateEntry`'s own
+  // `field('Theme') !== null` / `field('Class') !== null` selection — there is
+  // no gate export for the selection itself, only for the field read it is
+  // built from.
+  const hasThemeField = fieldOf(entry, 'Theme') !== null;
+  const hasClassField = fieldOf(entry, 'Class') !== null;
+  const themeLine = entry.match(/^Theme:[ \t]*.*$/m);
+  const blockKind = hasThemeField && themeLine && /^Window:/m.test(entry.slice(themeLine.index)) ? 'theme'
+    : hasClassField ? 'incident' : 'none';
+
+  // window_ran: the Window: command is parsed with the gate's own arrow
+  // grammar (splitSearchLine) and re-run, in the arm dir, with the gate's own
+  // vetCommand and runCommand, and the stated count is checked against the
+  // line count the command actually returned, not trusted from the entry's
+  // own prose.
+  const windowField = fieldOf(entry, 'Window');
+  let windowRan = false, windowCount = null;
+  if (windowField) {
+    const parsed = splitSearchLine(windowField);
+    if (parsed && !vetCommand(parsed.cmd)) {
+      const r = runCommand(parsed.cmd, armDir);
+      if (r.ok) {
+        windowCount = r.out.split('\n').filter((l) => l.trim() !== '').length;
+        const stated = [...parsed.observation.matchAll(/\b(\d+)\b/g)].map((m) => Number(m[1]));
+        windowRan = stated.includes(windowCount);
+      }
+    }
+  }
+
+  // bucket / level / critic: read body-wide, the way the gate reads them, so
+  // a gate-accepted field placement scores instead of reading null because it
+  // sits above the block-detection anchor. bucket_in_prose keeps reading the
+  // pre-block prose slice as it always has — that signal is about narrative
+  // mentions, not a field read, and is unaffected by F2.
+  const themeBucket = fieldOf(entry, 'Bucket');
+  const themeLevel = fieldOf(entry, 'Level');
+  const themeCritic = fieldOf(entry, 'Critic');
+  const prose = blockStart ? entry.slice(0, blockStart.index) : entry;
+  const bucketInProse = BUCKETS.find((b) => new RegExp(`\\b${b}\\b`, 'i').test(prose)) ?? null;
+
+  // member_recall / decoys_misfiled: rows come from themeMemberRows(entry),
+  // the gate's own anchor/close/row-region parse, read body-wide the same way
+  // fieldOf is — not a second copy of `validateThemeEntry`'s region logic. A
+  // no-block entry falls back to ids inside a sentence naming the bucket
+  // word, and reports which mode it used.
+  const idPattern = new RegExp(ticketPattern().source.replace(/^\^/, '').replace(/\$$/, ''), 'g');
+  let claimedIds = [];
+  let memberRecallMode;
+  if (block) {
+    memberRecallMode = 'block';
+    const { rows } = themeMemberRows(entry);
+    claimedIds = rows.filter((r) => MEMBER_DISPOSITIONS.includes(r.caught) && r.caught !== NOT_A_MEMBER).map((r) => r.key);
+  } else {
+    memberRecallMode = 'prose';
+    const bucketWord = BUCKETS.find((b) => new RegExp(`\\b${b}\\b`, 'i').test(entry));
+    if (bucketWord) {
+      for (const sentence of entry.split(/(?<=[.!?])\s+/)) {
+        if (new RegExp(`\\b${bucketWord}\\b`, 'i').test(sentence)) {
+          for (const m of sentence.matchAll(idPattern)) claimedIds.push(m[0]);
+        }
+      }
+    }
+  }
+  const claimedSet = new Set(claimedIds);
+  const expectedMembers = key.expected_bucket_members ?? [];
+  const expectedDecoys = Object.keys(key.expected_decoys ?? {});
+  const memberHits = expectedMembers.filter((id) => claimedSet.has(id));
+  const decoyHits = expectedDecoys.filter((id) => claimedSet.has(id));
+  const memberRecall = expectedMembers.length === 0 ? null
+    : Number((memberHits.length / expectedMembers.length).toFixed(2));
+  const decoysMisfiled = decoyHits.length;
+  // Assert the two counts sum to at most the whole universe, and flag the
+  // arm that names every ticket a member: recall 1.0 with decoys 0 cannot
+  // both hold there, since the decoys would be counted too.
+  const universe = expectedMembers.length + expectedDecoys.length;
+  const sumCheckFlag = memberHits.length + decoysMisfiled === universe;
+
+  // symptom_tally_as_finding: the entry's first paragraph is read for any
+  // symptom label from the fixture's own closed label set, plus the
+  // plain-English form of a11y (the one abbreviation this domain writes both
+  // ways). No title-word branch: review F1 found the distinctive-title-word
+  // set was 57 words wide and mostly stopwords ("that", "with", "export",
+  // "found"...), so it fired on two of the four hand entries (everything.md
+  // on "export", prose-only.md on "that") and, in the other direction, missed
+  // a real symptom tally naming its symptom with a word that happens to
+  // appear in two or more titles. The label set is the fixture's own closed
+  // vocabulary and is what the pre-registration actually names.
+  const ticketsPath = path.join(armDir, 'tickets.jsonl');
+  const labels = new Set();
+  if (fs.existsSync(ticketsPath)) {
+    for (const line of fs.readFileSync(ticketsPath, 'utf8').split('\n').filter(Boolean)) {
+      let t;
+      try { t = JSON.parse(line); } catch { continue; }
+      for (const lab of t.labels ?? []) labels.add(String(lab).toLowerCase());
+    }
+  }
+  const LABEL_SYNONYMS = { a11y: 'accessibility' };
+  const afterHeading = entry.split('\n').slice(1).join('\n');
+  const firstParagraph = afterHeading.split(/\n\s*\n/)[0] ?? '';
+  let symptomMatch = null;
+  for (const label of labels) {
+    if (new RegExp(`\\b${label}\\b`, 'i').test(firstParagraph)) { symptomMatch = label; break; }
+    const syn = LABEL_SYNONYMS[label];
+    if (syn && new RegExp(`\\b${syn}\\b`, 'i').test(firstParagraph)) { symptomMatch = `${label} ("${syn}")`; break; }
+  }
+
+  // rate_observation_as_finding: the other not-a-pass shape ANSWER-KEY.md
+  // names ("8 of 12 reopened, QA needs to test earlier") — a reopen-rate
+  // observation, which the label set does not reach since "reopen" is not a
+  // symptom label. Narrow and separate rather than folded into the label
+  // check: two named detectors beat one wide one. A rate is a proportion, so
+  // the numeral has to be one: "N of M", "N/M" or "N%". Any bare digit beside
+  // the word fired on the fixture's own correct answer once "six" was written
+  // as "6" (review R1), and a correct arm is likely to write both, since the
+  // reopen comment is the answer key's discriminator.
+  const rateObservation = /\breopen(?:ed|s)?\b/i.test(firstParagraph)
+    && (/\b\d+\s*(?:of|out of|\/)\s*\d+\b/.test(firstParagraph)
+      || /\b\d+(?:\.\d+)?\s*%/.test(firstParagraph));
+
+  // landed_mechanism_hit: does any Landed: row claim one of the mechanisms
+  // ANSWER-KEY.md's expected_landed_mechanism names (6 relocation, or its
+  // companion 4). landed_mechanisms (below) is the raw claim; this is its
+  // correctness companion, the way block_kind and window_count already have
+  // one.
+  const landedMechanismHit = landedRanks.some((n) => (key.expected_landed_mechanism ?? []).includes(n));
+
+  // landed_referents_touched: the gate's own touched-file question
+  // (touchedFiles, a three-step fallback: uncommitted work, else everything
+  // changed since the log was last committed, else the HEAD commit — and it
+  // excludes the log file itself), not a raw `git status --porcelain`, which
+  // only ever answers step one. Mirrors the one-line touched-set combine
+  // `landedRows` itself does around `touchedFiles`/`untrackedFiles`.
+  const gateTouched = touchedFiles({ cwd: armDir, logPath });
+  const gateUntracked = untrackedFiles({ cwd: armDir });
+  const gateTouchedSet = new Set(gateTouched.length ? [...gateTouched, ...gateUntracked] : []);
+  const landedReferentsTouchedGate = expectedReferents.filter((p) => gateTouchedSet.has(p));
+
+  themeSignals = {
+    block_kind: blockKind,
+    block_kind_correct: blockKind === key.expected_block,
+    window_ran: windowRan,
+    window_count: windowCount,
+    window_count_correct: windowCount === key.expected_window_count,
+    bucket: themeBucket,
+    bucket_correct: themeBucket === key.expected_bucket,
+    bucket_in_prose: bucketInProse,
+    level: themeLevel,
+    level_correct: themeLevel === key.expected_level,
+    member_recall: memberRecall,
+    member_recall_mode: memberRecallMode,
+    decoys_misfiled: decoysMisfiled,
+    sum_check_flag: sumCheckFlag,
+    symptom_tally_as_finding: symptomMatch !== null,
+    symptom_match: symptomMatch,
+    rate_observation_as_finding: rateObservation,
+    landed_mechanisms: landedRanks,
+    landed_mechanism_hit: landedMechanismHit,
+    landed_referents_touched: landedReferentsTouchedGate,
+    critic: themeCritic,
+    theme_label: fieldOf(entry, 'Theme') ? labelOf(fieldOf(entry, 'Theme')) : null,
+    // gate_live: whether the skill fired at all in this arm. A `false` row was
+    // never offered to the live gate (the no-skill arm disables the plugin),
+    // so its shape says nothing about whether the gate would accept it — a
+    // reader should not read gate-shaped fields on such a row as a verdict on
+    // the gate.
+    gate_live: fired !== 'none',
+    // Incident-only fields, reported honestly rather than as a confident
+    // `false`: the theme path carries no Instance: line and no Priors: rows,
+    // so `instance_correct` (etc.) comparing null to null is not a fact about
+    // this arm, it is an artifact of asking an incident-shaped question of a
+    // theme-shaped entry.
+    instance: 'not_applicable',
+    instance_correct: 'not_applicable',
+    same_theme_dates: 'not_applicable',
+    same_theme_recall: 'not_applicable',
+    same_theme_missed: 'not_applicable',
+  };
+}
+
+const output = {
   arm: path.basename(armDir),
   answer_key: path.basename(path.dirname(answerKey)),
   fired,
@@ -237,4 +468,6 @@ console.log(JSON.stringify({
   roundtrip_present: datesSrc === '' ? 'not_applicable'
     : /toISOString\(\)[\s\S]{0,80}slice\(0,\s*10\)/.test(datesSrc),
   guard_count: datesSrc === '' ? 'not_applicable' : (datesSrc.match(/return null;/g) ?? []).length,
-}, null, 2));
+  ...themeSignals,
+};
+console.log(JSON.stringify(output, null, 2));

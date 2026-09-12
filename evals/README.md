@@ -76,3 +76,19 @@ property nothing else does, and it costs about two minutes.
 
 Record the result in `RESULTS.md` when you run it, including the date and the
 model. A trigger result is only true for the model that produced it.
+
+## Fixture rules
+
+**A fixture may not state any bucket, not only the planted one.** The export
+is checked for a closed, per-bucket list of confession phrases that the
+answer key carries, and for reopen comments that cite an earlier comment's
+date, before a fixture ships; that check closes the phrasings and dates it
+enumerates, not every way a comment could point back at an earlier one in
+plain prose, so a fresh reader is still the layer that catches a
+back-reference the list does not name. A fresh reader gets the bundle's
+contents and the prompt cold, before the pre-registration table is frozen,
+and the reader's answer is recorded in the table. The table also predicts
+what the arm with nothing loaded does. Run 11 is why: its fixture's reopen
+comments told every arm the answer, and the arm with nothing loaded read the
+export
+and found the finding in ninety seconds.

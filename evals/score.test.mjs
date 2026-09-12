@@ -488,3 +488,377 @@ test('no label in tickets.jsonl groups more tickets than expected_symptom_themes
     );
   }
 });
+
+// evals/README.md, "Fixture rules": a fixture's export may not state any
+// bucket, planted or decoy. Two checks, both over every ticket's comments:
+// no sentence in a comment body matches a confession regex from the
+// fixture's own answer key (checked per bucket -- unread, missing,
+// unrecorded, misunderstood, none -- case-insensitively), and no comment
+// dated on or after a ticket's reopen contains a date string equal to an
+// earlier comment's date on the same ticket. Both live here rather than in
+// the fixture's own build, since backlog-read (the confessing sibling, kept
+// on purpose per its own "Known artificialities") has to be checkable too,
+// as the red proof below. Matching is sentence-scoped -- a comment body is
+// split on sentence boundaries and each regex is tried against one sentence
+// at a time -- so a compound regex requiring two words to co-occur only
+// fires when they share a sentence, not merely a comment (2026-09-11
+// maintainer ruling, after a fresh review found three false positives on
+// bare "did not see"/"never saw" and six decoys that confess their own
+// bucket in plain language the old flat list never looked for).
+
+function readAnswerKeyJson(answerKeyPath) {
+  const keyText = fs.readFileSync(answerKeyPath, 'utf8');
+  return JSON.parse(keyText.match(/```json\n([\s\S]*?)```/)[1]);
+}
+
+function readTickets(ticketsPath) {
+  return fs.readFileSync(ticketsPath, 'utf8')
+    .split('\n').filter(Boolean).map((l) => JSON.parse(l));
+}
+
+// The "at" of the first comment whose body contains "reopen" (case-
+// insensitive) is the reopen point for every one of backlog-read's six
+// confessing members, and for its one reopen-count-1 decoy that uses the
+// word (INV-111) -- read from the export, this is the shape: a later comment
+// literally says "Reopening." Two decoys carry reopen_count: 1 with no
+// comment ever using the word (INV-102, INV-114); for those there is no
+// textual reopen marker, so this falls back to the comment right after the
+// first "PR up"/"closed" comment, the export's other signal of a round trip
+// through review. A ticket with neither signal has no reopen point and is
+// left out of the date-citation half of the check below -- there is nothing
+// there for it to leak. (Correction, 2026-09-11 review: an earlier version of
+// this comment named INV-108 as a decoy that uses the word; INV-108 carries
+// reopen_count: 0 and no comment on it says "reopen" at all -- confirmed by
+// running reopenAt(INV-108), which returns null. It never reaches either
+// branch and is simply excluded, same as INV-105 and INV-117.)
+function reopenAt(ticket) {
+  const comments = ticket.comments ?? [];
+  const named = comments.find((c) => /reopen/i.test(c.body ?? ''));
+  if (named) return named.at;
+  if (ticket.reopen_count === 1) {
+    const markerIdx = comments.findIndex((c) => /pr up|closed/i.test(c.body ?? ''));
+    if (markerIdx >= 0 && comments[markerIdx + 1]) return comments[markerIdx + 1].at;
+  }
+  return null;
+}
+
+function shortForm(isoDate) {
+  return isoDate.slice(5); // "2026-03-04" -> "03-04"
+}
+
+// A YYYY-MM-DD or MM-DD token in a comment's body, equal to an earlier
+// comment's own "at" date on the same ticket. "Earlier" is by position in
+// the comments array, which is the export's own chronological order.
+function dateCitations(ticket) {
+  const comments = ticket.comments ?? [];
+  const hits = [];
+  for (let i = 0; i < comments.length; i++) {
+    const body = comments[i].body ?? '';
+    const tokens = body.match(/\b\d{4}-\d{2}-\d{2}\b|\b\d{2}-\d{2}\b/g) ?? [];
+    for (const token of tokens) {
+      for (let j = 0; j < i; j++) {
+        const earlier = comments[j].at;
+        if (!earlier) continue;
+        const matches = token.length === 10 ? token === earlier : token === shortForm(earlier);
+        if (matches) hits.push({ commentAt: comments[i].at, token, citedAt: earlier });
+      }
+    }
+  }
+  return hits;
+}
+
+// Sentence boundaries: split after ./!/? followed by whitespace. Good enough
+// for this fixture family's short, plainly-punctuated comments; it is not a
+// general sentence tokenizer and does not need to be one here.
+function sentencesOf(body) {
+  return (body ?? '').split(/(?<=[.!?])\s+/).filter(Boolean);
+}
+
+// confessionPhrasesByBucket: { bucket: [regexSourceString, ...], ... }, from
+// the fixture's own answer key. Every sentence of every comment is tested
+// against every regex in every bucket; a hit records which bucket's
+// vocabulary fired, so a decoy stating its own bucket is caught exactly like
+// a member stating unread.
+function bucketConfessionHits(ticketsPath, confessionPhrasesByBucket) {
+  const tickets = readTickets(ticketsPath);
+  const hits = [];
+  for (const ticket of tickets) {
+    for (const c of ticket.comments ?? []) {
+      const sentences = sentencesOf(c.body);
+      for (const [bucket, patterns] of Object.entries(confessionPhrasesByBucket)) {
+        for (const pattern of patterns) {
+          const re = new RegExp(pattern, 'i');
+          if (sentences.some((s) => re.test(s))) {
+            hits.push({ id: ticket.id, at: c.at, bucket, pattern });
+          }
+        }
+      }
+    }
+  }
+  return hits;
+}
+
+function findFindingLeaks(ticketsPath, confessionPhrasesByBucket) {
+  const tickets = readTickets(ticketsPath);
+  const phraseHits = bucketConfessionHits(ticketsPath, confessionPhrasesByBucket);
+  const dateHits = [];
+  for (const ticket of tickets) {
+    const reopen = reopenAt(ticket);
+    if (reopen != null) {
+      for (const hit of dateCitations(ticket)) {
+        if (hit.commentAt >= reopen) dateHits.push({ id: ticket.id, ...hit });
+      }
+    }
+  }
+  return { phraseHits, dateHits };
+}
+
+const DATES_FIXTURE = path.join(import.meta.dirname, 'fixtures', 'backlog-read-dates');
+const DATES_ANSWER_KEY = path.join(DATES_FIXTURE, 'ANSWER-KEY.md');
+const DATES_TICKETS = path.join(DATES_FIXTURE, 'tickets.jsonl');
+
+// backlog-read is exempt from the auto-scan below on purpose: its answer key
+// carries no confession_phrases (it is the sibling that confesses by design,
+// per its own "Known artificialities" section), and it is exercised
+// separately, on demand, as the red proof that the check can fail. Named here
+// so a future answer key edit that accidentally adds confession_phrases to
+// backlog-read/ANSWER-KEY.md does not silently fold it into the governed set.
+const RED_PROOF_EXEMPT = new Set(['backlog-read']);
+
+// Every fixture directory whose answer key carries confession_phrases is
+// governed by the "does not state its finding" rule (evals/README.md,
+// "Fixture rules") -- not one hardcoded const. A fixture with no
+// tickets.jsonl yet skips, naming why; convention-spread and date-validity
+// carry no confession_phrases at all and are not scanned, since the rule has
+// no mechanism to apply to a fixture with no ticket export.
+function governedFixtures() {
+  const fixturesDir = path.join(import.meta.dirname, 'fixtures');
+  const dirs = fs.readdirSync(fixturesDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .filter((name) => !RED_PROOF_EXEMPT.has(name));
+  const governed = [];
+  for (const name of dirs) {
+    const answerKeyPath = path.join(fixturesDir, name, 'ANSWER-KEY.md');
+    if (!fs.existsSync(answerKeyPath)) continue;
+    const key = readAnswerKeyJson(answerKeyPath);
+    if (key.confession_phrases && typeof key.confession_phrases === 'object') {
+      governed.push({ name, dir: path.join(fixturesDir, name), answerKeyPath });
+    }
+  }
+  return governed;
+}
+
+// Coverage floor for the date half (2026-09-11 second review, R1): the count
+// of tickets with a non-null reopenAt() must meet a number the fixture's own
+// answer key carries (`expected_reopen_points`), not merely "no reopen_count
+// 1 ticket lacks a point" -- that weaker form is satisfied vacuously by a
+// mutation that also zeroes reopen_count, and the review demonstrated it
+// passing silently. This lives in the governed, per-fixture test (the one
+// that guards fixtures as they ship), not only in the red test against the
+// sibling below -- the first pass put it in the wrong place.
+function reopenPointCount(ticketsPath) {
+  return readTickets(ticketsPath).filter((t) => reopenAt(t) != null).length;
+}
+
+for (const gf of governedFixtures()) {
+  test(`a fixture's export does not state its finding: ${gf.name}`, (t) => {
+    const ticketsPath = path.join(gf.dir, 'tickets.jsonl');
+    if (!fs.existsSync(ticketsPath)) {
+      t.skip(`${gf.name}/tickets.jsonl does not exist yet -- the fixture files (tickets.jsonl, docs/, bundle) have not been built`);
+      return;
+    }
+    const key = readAnswerKeyJson(gf.answerKeyPath);
+    const { phraseHits, dateHits } = findFindingLeaks(ticketsPath, key.confession_phrases);
+    assert.deepEqual(phraseHits, [], `confession phrase(s) found in ${gf.name}: ${JSON.stringify(phraseHits)}`);
+    assert.deepEqual(dateHits, [], `comment(s) at or after a reopen citing an earlier comment's date in ${gf.name}: ${JSON.stringify(dateHits)}`);
+
+    // Required, not opt-in: a governed fixture whose key omits the field would
+    // skip the floor and the date half could go quiet unseen (third review).
+    assert.ok(
+      Number.isInteger(key.expected_reopen_points),
+      `${gf.name}'s answer key must carry expected_reopen_points, the count of tickets with a detectable reopen point, so the date half of this check cannot go quiet silently`,
+    );
+    const actual = reopenPointCount(ticketsPath);
+    assert.equal(
+      actual,
+      key.expected_reopen_points,
+      `expected ${key.expected_reopen_points} tickets with a detectable reopen point in ${gf.name}, found ${actual}. Either a ticket was added or removed (update the key) or the reopen vocabulary ("Reopening.", "PR up") drifted out from under reopenAt()`,
+    );
+  });
+}
+
+// Watched red: the same two checks against the confessing sibling, using
+// backlog-read-dates's confession_phrases -- fixture-specific vocabulary
+// shared by both, since backlog-read-dates's six members are the same twelve
+// tickets with only the confessions edited out. This must fail on both
+// halves independently, not only in their union: a phrase list gutted to one
+// entry still leaves the date half at six members, which would keep a
+// union-only assertion green while the phrase half stopped covering anything
+// (2026-09-11 review, verified by shrinking the list to one phrase). Each
+// half's own member count is asserted separately here.
+test("a fixture's export does not state its finding: backlog-read fails this check (red, expected)", () => {
+  const confessionPhrasesByBucket = readAnswerKeyJson(DATES_ANSWER_KEY).confession_phrases;
+  const { phraseHits, dateHits } = findFindingLeaks(path.join(FIXTURE, 'tickets.jsonl'), confessionPhrasesByBucket);
+
+  const unreadPhraseHits = phraseHits.filter((h) => h.bucket === 'unread');
+  const unreadPhraseMembers = new Set(unreadPhraseHits.map((h) => h.id));
+  assert.ok(
+    unreadPhraseMembers.size >= 5,
+    `expected the unread phrase list alone to cover at least five members, found ${unreadPhraseMembers.size}: ${[...unreadPhraseMembers].sort().join(', ')}`,
+  );
+
+  const dateMembers = new Set(dateHits.map((h) => h.id));
+  assert.ok(
+    dateMembers.size >= 5,
+    `expected the date-citation half alone to cover at least five members, found ${dateMembers.size}: ${[...dateMembers].sort().join(', ')}`,
+  );
+
+  // Extra, per the 2026-09-11 maintainer ruling: a fixture may not state any
+  // bucket, so backlog-read's six decoys -- each of which confesses its own
+  // non-unread bucket in plain language -- must also register as hits, under
+  // their own bucket names, not the unread one.
+  const decoyBucketHits = phraseHits.filter((h) => h.bucket !== 'unread');
+  const decoyMembers = new Set(decoyBucketHits.map((h) => h.id));
+  assert.ok(
+    decoyMembers.size >= 6,
+    `expected all six decoys to confess their own bucket, found ${decoyMembers.size}: ${[...decoyMembers].sort().join(', ')}`,
+  );
+
+  // Coverage floor, sibling copy: the same count check the governed test now
+  // runs (above), against backlog-read itself, pinned against
+  // backlog-read-dates's expected_reopen_points since both fixtures share the
+  // same twelve tickets and reopen vocabulary. Keeping this copy here, next
+  // to the phrase- and date-half assertions it sits beside, is fine per the
+  // 2026-09-11 review; the defect was that it was the ONLY copy.
+  const expectedReopenPoints = readAnswerKeyJson(DATES_ANSWER_KEY).expected_reopen_points;
+  const actualReopenPoints = reopenPointCount(path.join(FIXTURE, 'tickets.jsonl'));
+  assert.equal(
+    actualReopenPoints,
+    expectedReopenPoints,
+    `expected ${expectedReopenPoints} tickets with a detectable reopen point in backlog-read, found ${actualReopenPoints}`,
+  );
+});
+
+// The reviewer's own reopen-marker candidate (2026-09-11 second review, R1):
+// reword the tracker's reopen vocabulary ("Reopening." -> "Sending back.",
+// "PR up" -> "Change is ready") while leaving reopen_count and every date
+// citation untouched. The first version of the coverage floor missed this --
+// it lived only in the red test above, filtered to reopen_count === 1 first,
+// so a mutation that also zeroed reopen_count would have passed vacuously,
+// and this one (which does not even touch reopen_count) passed silently
+// against the un-floored governed test. Built here as a real mutation of the
+// sibling's own comments, not described.
+test('coverage floor catches the reviewer\'s reopen-vocabulary-drift candidate', () => {
+  const expectedReopenPoints = readAnswerKeyJson(DATES_ANSWER_KEY).expected_reopen_points;
+  const tickets = readTickets(path.join(FIXTURE, 'tickets.jsonl'));
+  assert.equal(
+    tickets.filter((t) => reopenAt(t) != null).length,
+    expectedReopenPoints,
+    'sanity: the unmutated sibling should hit the expected reopen-point count before mutation',
+  );
+
+  const reworded = tickets.map((t) => ({
+    ...t,
+    comments: (t.comments ?? []).map((c) => ({
+      ...c,
+      body: (c.body ?? '').replace(/Reopening\./gi, 'Sending back.').replace(/PR up/gi, 'Change is ready'),
+    })),
+  }));
+  const afterCount = reworded.filter((t) => reopenAt(t) != null).length;
+  assert.notEqual(
+    afterCount,
+    expectedReopenPoints,
+    `expected the reopen-vocabulary reword to drop the reopen-point count below ${expectedReopenPoints}, found it unchanged at ${afterCount} -- the coverage floor would not catch this candidate`,
+  );
+  // Every date citation the reviewer's candidate keeps is still visible to
+  // the export; only the reopen-point count reads it as quiet.
+  const citationCount = reworded.reduce((n, t) => n + dateCitations(t).length, 0);
+  assert.ok(citationCount > 0, 'sanity: the reworded candidate should still carry date citations in its comment bodies');
+});
+
+// Sentence-scoped matching, regression cover, extended to every bucket
+// (2026-09-11 second review, R5: the record-noun gate was applied to the
+// unread list only; the four decoy lists carried the same defect, with
+// `\bagreed on\b.*\bcall\b` also matching inside "call-to-action" on top of
+// it). False positives are built, not described; true positives are the
+// fixture's own real member/decoy text, so a future change to a gate is
+// caught even if someone edits the fixture out from under it.
+function confessionPatterns(bucket) {
+  return readAnswerKeyJson(DATES_ANSWER_KEY).confession_phrases[bucket];
+}
+
+function hitsInBucket(body, bucket) {
+  const sentences = sentencesOf(body);
+  const hits = [];
+  for (const pattern of confessionPatterns(bucket)) {
+    const re = new RegExp(pattern, 'i');
+    if (sentences.some((s) => re.test(s))) hits.push(pattern);
+  }
+  return hits;
+}
+
+const SENTENCE_SCOPE_CASES = [
+  {
+    bucket: 'unread',
+    falsePositives: [
+      'on a slow connection the toast fires and clears before the page paints, so the user never saw the confirmation',
+      'They did not see the overdue badge at all on the tablet breakpoint.',
+      'The empty state renders behind the modal. Testers on the 13-inch screen did not see it.',
+    ],
+    truePositive: 'Did not see that comment, built to the description. Fixed.',
+  },
+  {
+    bucket: 'missing',
+    // R5: "The export dialog never specified a filename" reads like the same
+    // shape as the real confession without the first-person subject; "no
+    // character limit on the requirement field anywhere in the editor" reads
+    // like the real confession without the developer's own "built against"
+    // framing; "Nothing in the ticket queue view..." names a ticket without
+    // pairing it with "design", which the real confession always does.
+    falsePositives: [
+      'The export dialog never specified a filename.',
+      'no character limit on the requirement field anywhere in the editor',
+      'Nothing in the ticket queue view tells the user which filter is active.',
+    ],
+    truePositive: 'We never specified what happens offline or on a failed save. Nothing in the ticket, nothing in the design.',
+  },
+  {
+    bucket: 'unrecorded',
+    // R5: "no way to know" needs the same record-noun gate as the unread
+    // perception phrases; "agreed on ... call" needed a boundary against
+    // "call-to-action", not just a record noun, since \bcall\b already
+    // matches inside a hyphenated word.
+    falsePositives: [
+      'the customer has no way to know the invoice was not sent',
+      'We agreed on the call-to-action wording in the design review.',
+      'no way to know which of the two accounts the session belongs to',
+    ],
+    truePositive: "Different dev built the PDF path and had no way to know that, it was only in the call. As agreed on Tuesday's call, rounding is per line, then summed.",
+  },
+  {
+    // No false positive was demonstrated against this list; it is included
+    // for parity of coverage (every bucket gets a pinned true-positive check)
+    // rather than because a defect was found here.
+    bucket: 'misunderstood',
+    falsePositives: [],
+    truePositive: 'We read hidden as excluded. Both readings fit the sentence. We assumed the other one. Neither was written.',
+  },
+  {
+    bucket: 'none',
+    // R5: nearly the same wording as the real confession, describing a
+    // different report entirely -- the gate requires "test" in the same
+    // sentence, which the real confession names and this does not.
+    falsePositives: ['The report checks the status, not the rows.'],
+    truePositive: 'The test passed because it checks the status, not the rows.',
+  },
+];
+
+for (const c of SENTENCE_SCOPE_CASES) {
+  test(`sentence-scoped ${c.bucket} confession matching: false positives clear, real text still fires`, () => {
+    for (const body of c.falsePositives) {
+      assert.deepEqual(hitsInBucket(body, c.bucket), [], `expected no ${c.bucket} confession hit on ordinary prose: "${body}"`);
+    }
+    assert.ok(hitsInBucket(c.truePositive, c.bucket).length > 0, `expected the real ${c.bucket} text to still register as a confession`);
+  });
+}

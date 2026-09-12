@@ -43,7 +43,10 @@ const key = JSON.parse(keyBlock[1]);
 // means the original incident shape, unchanged.
 const kind = key.kind === 'theme' ? 'theme' : 'incident';
 const REQUIRED_FIELDS = kind === 'theme'
-  ? ['expected_bucket', 'expected_bucket_members', 'expected_decoys', 'expected_window_count', 'expected_block', 'expected_level']
+  // A theme block carries no Level: line, so expected_level is not measurable
+  // on a theme fixture and is optional there (run 11: both skill arms scored
+  // level null on a correct entry). Present, it is still held to LEVELS.
+  ? ['expected_bucket', 'expected_bucket_members', 'expected_decoys', 'expected_window_count', 'expected_block']
   : ['expected_same_theme', 'expected_instance', 'expected_level', 'expected_bucket'];
 for (const f of REQUIRED_FIELDS) {
   if (key[f] === undefined) { console.error(`${answerKey}: the json block has no ${f}`); process.exit(2); }
@@ -53,7 +56,7 @@ if (kind === 'theme') {
     console.error(`${answerKey}: expected_bucket "${key.expected_bucket}" is not one of ${BUCKETS.join(', ')}`);
     process.exit(2);
   }
-  if (!LEVELS.includes(key.expected_level)) {
+  if (key.expected_level !== undefined && !LEVELS.includes(key.expected_level)) {
     console.error(`${answerKey}: expected_level "${key.expected_level}" is not one of ${LEVELS.join(', ')}`);
     process.exit(2);
   }
@@ -614,7 +617,8 @@ if (kind === 'theme') {
     // wrong one, and false read as wrong on every block-less arm.
     bucket_correct: themeBucket === null ? null : themeBucket === key.expected_bucket,
     level: themeLevel,
-    level_correct: themeLevel === null ? null : themeLevel === key.expected_level,
+    level_correct: key.expected_level === undefined ? 'not_applicable'
+      : themeLevel === null ? null : themeLevel === key.expected_level,
     member_recall: proseMode ? null : memberRecall,
     decoys_misfiled: proseMode ? null : decoysMisfiled,
     decoys_dismissed: decoysDismissed,

@@ -380,3 +380,89 @@ rather than concluding from one run: the 3a paragraph teaching `none` shipped th
 day before, and a value that was previously unreachable is now reachable and was
 reached on its first outing.
 
+## Run 11, 2026-09-11, Opus, the periodic read on the backlog-read fixture
+
+First run against the skill's stated goal, a process finding read off a
+tracker export rather than a code fix read off a bug. Five arms, one `claude
+-p` each in a fresh clone of `evals/fixtures/backlog-read/backlog-read.bundle`,
+prompt verbatim from the fixture README. cand-1 and cand-2 with the installed
+1.3.1. base-1 and base-2 with the plugin disabled and the 1.1.0 copy from the
+cache in the clone's `.claude/skills`, run 10's baseline, which carries the
+whole procedure minus the block. base-0 with nothing loaded at all, the arm the
+plan's §6 asked for and the base arms could not answer. base-2's first attempt
+hit the session rate limit (429) at turn 12, wrote nothing, and was rerun.
+
+Two procedural differences from run 10, both recorded rather than hidden.
+`--allowedTools` was widened to Bash, Read, Write, Edit, Grep, Glob, Task and
+Skill, because run 10's arms were refused reading the skill's own references
+from the cache path under a bare `acceptEdits`. And the model was
+`claude-opus-5` rather than `claude-opus-5[1m]`.
+
+Scored by `evals/score.mjs` against `ANSWER-KEY.md` with `kind: theme`, against
+`PREREGISTRATION.md`, which froze at cand-1's start. Prose-derived signals are
+reported, not scored; the two hand-graded columns are mine (the agent running
+the session, initials AG), read under the answer key's rule, and the user did
+not grade.
+
+| Signal | cand-1 | cand-2 | base-1 | base-2 | base-0 |
+|---|---|---|---|---|---|
+| fired | installed | installed | candidate (1.1.0) | candidate (1.1.0) | none |
+| completed | yes | yes | yes | yes (rerun) | yes |
+| wrote an entry | yes | yes | yes | yes | **no** |
+| references opened | 3 | 4 | 1 | 1 | 0 |
+| `block_kind` | theme | theme | none | none | none |
+| `Window:` ran, count | yes, 12 | yes, 12 | none | none | none |
+| `Bucket:` (block) | unread | unread | none | none | none |
+| member recall (block) | 1.0 | 1.0 | n/a | n/a | n/a |
+| decoys misfiled (block) | 0 | 0 | n/a | n/a | n/a |
+| `Landed:` mechanisms | 1, 2, 5, 6 | 5, 3 | none | none | none |
+| expected referents touched | both | dod only | both | both | none |
+| critic | ran | ran | none | none | none |
+| hand-graded `bucket_named` (AG) | n/a, block | n/a, block | unread | unread | unread |
+| hand-graded `members_named` (AG) | n/a, block | n/a, block | 6 | 6 | 6 |
+| reported `bucket_in_prose` | unrecorded | missing | missing | missing | none |
+
+**Every arm that finished found the finding.** Both skill arms wrote the theme
+block with `unread`, six of six members, no decoy claimed, the `Window:`
+executed at twelve. base-1, with no block to write, stated the same six and the
+same cause in prose, "requirements sitting one field away from where we
+build". base-0, with nothing loaded, said "6 of 12, the requirement was already
+written on the ticket by the right person before work started", named the six
+in a table, and picked a ready-to-start gate as the one change, in eight turns
+and ninety seconds. The pre-registered contingency held: a competent reader of
+twelve tickets finds this without help. The confessing reopen comments are why,
+and the dates-only variant is the next fixture.
+
+**So what the skill adds on this fixture is the artifact and the landed
+change, not the diagnosis.** base-0 left nothing on disk. base-1 left a prose
+entry and edited both docs. The skill arms left a gate-checked entry whose
+members are bound to a retrieval, and landed changes with referents: cand-1 a
+runnable check with a red-and-green fixture (mechanisms 1 and 2) plus both
+docs, cand-2 a written check and one doc (3 and 5). That is where the arms
+differ, and it is the axis the answer key grades as the fix.
+
+**The prose leads say the wrong bucket on four of four correct entries.**
+`reported.bucket_in_prose` read `unrecorded`, `missing`, `missing` and
+`missing` on entries whose block or heading says unread, one of which names
+"bucket 2" in so many words. This is the reader's B2 on live
+arms, and the reason those signals are reported and not scored.
+
+**`expected_level` is not measurable on a theme fixture.** The theme block has
+no `Level:` line, so both skill arms score `level: null`. The key's
+`expected_level: process` was carried over from the incident shape and should
+be dropped from the theme key.
+
+**The fixture has a defect the arms found and I did not.** INV-111's close
+comment says the rounding rule ("per line, then summed") was written into
+`docs/conventions.md`; the shipped `conventions.md` says the opposite. base-1
+flagged it as unresolved. Fixed after this run, so every arm here saw the same
+bundle; the next run sees the corrected one.
+
+**One arm in five was void the first time, for a harness reason.** base-2's
+first attempt was a 429, not a skill behaviour; the rerun completed and is the
+column above. Run 10's cand-2 wrote no entry and completed; that shape did not
+recur here. base-2's entry also names the two escapes and the reopen shape of
+the decoys, and, like base-1, lands a ready gate in both docs; it added a
+`tools/` directory the block does not reference, which a block would have had
+to account for.
+

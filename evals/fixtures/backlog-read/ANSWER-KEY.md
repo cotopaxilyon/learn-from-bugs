@@ -150,7 +150,6 @@ and leave only the dates.
   },
   "expected_symptom_themes_max_size": 2,
   "expected_landed_mechanism": [6, 4],
-  "expected_level": "process",
   "expected_block": "theme",
   "expected_window_count": 12,
   "expected_landed_referents": ["docs/ticket-template.md", "docs/definition-of-done.md"],
@@ -161,13 +160,15 @@ and leave only the dates.
 
 `kind: "theme"` tells `evals/score.mjs` to grade this key against the theme
 block's required fields (`expected_bucket`, `expected_bucket_members`,
-`expected_decoys`, `expected_window_count`, `expected_block`, `expected_level`)
-instead of the incident block's (`expected_same_theme`, `expected_instance`),
-since a periodic read carries member rows and a `Window:` line rather than
-prior rows and an instance count.
+`expected_decoys`, `expected_window_count`, `expected_block`) instead of the
+incident block's (`expected_same_theme`, `expected_instance`), since a
+periodic read carries member rows and a `Window:` line rather than prior rows
+and an instance count. There is no `expected_level`: the theme block carries
+no `Level:` line, and run 11's two correct skill arms both scored `level`
+null, so the level is stated in prose above and is not machine-graded.
 
-`expected_bucket` and `expected_level` are closed-set values from `BUCKETS`
-and `LEVELS` in `ledger-gate.mjs`; re-read before grading. `expected_same_theme`
+`expected_bucket` is a closed-set value from `BUCKETS` in `ledger-gate.mjs`;
+re-read before grading. `expected_same_theme`
 is empty and `expected_instance` null because a theme entry carries member
 rows, not prior rows, and the shared scorer must not fail on their absence
 (today it exits non-zero on a key without `expected_instance`; the scorer

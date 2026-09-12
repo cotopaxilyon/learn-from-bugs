@@ -2,8 +2,9 @@
 
 ## Money
 
-Totals are computed in integer minor units and rounded once, at display.
-Never round an intermediate.
+Rounding is per line, then summed. Every path that produces a total, the
+screen and the PDF alike, rounds each line to minor units first and adds the
+rounded lines. Never round a summed total again.
 
 ## Dates
 

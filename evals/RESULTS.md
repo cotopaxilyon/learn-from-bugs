@@ -461,8 +461,44 @@ bundle; the next run sees the corrected one.
 **One arm in five was void the first time, for a harness reason.** base-2's
 first attempt was a 429, not a skill behaviour; the rerun completed and is the
 column above. Run 10's cand-2 wrote no entry and completed; that shape did not
-recur here. base-2's entry also names the two escapes and the reopen shape of
-the decoys, and, like base-1, lands a ready gate in both docs; it added a
-`tools/` directory the block does not reference, which a block would have had
-to account for.
+recur here.
+
+### Run 11 addendum: the artifacts, graded
+
+Since the diagnosis was a wash, a fresh reader graded what each arm left on
+disk, running the two executable checks in copies and mutating each to see
+whether it could go red. Four closed questions: the mechanism claimed against
+the one earned per `land-a-change.md`; whether next month's reader retrieves
+the entry from the log (the gate's own `classLabelsIn` and `resolvePrior`,
+imported); whether the change closes the class or restates the rule; and one
+ticket shape that still passes the landed gate.
+
+| Arm | Mechanism claimed → earned | Retrieval | Closes or restates | Still passes |
+|---|---|---|---|---|
+| cand-1 | 1→1 (blocks the six, passes six, exit 1), 2→**not 2** (fixture cannot fail), 5→5, 6→6 | yes | restates, says so | a requirement comment posted the same day the description was written |
+| cand-2 | 5→5, 3→3, declined to claim 1 | yes | restates, says so | an unrelated description edit after the comment clears it |
+| base-1 | none claimed; earns 4, 5, 6 | partial: no label | restates, says so | both boxes ticked with a field the tracker does not expose |
+| base-2 | none claimed; earns 1, 2, 4, 5, 6 | partial: `Class:` mid-line, invisible to the gate | restates, says so | a requirement comment one day after the transition |
+| base-0 | nothing landed | no entry | neither | everything |
+
+**The block bought retrievability and accounting, mechanically demonstrable,
+and nothing else on this run.** Both block arms carry a label the gate
+harvests and numbered `Landed:` rows over all twelve dispositioned tickets, so
+a later altitude read can count. Neither block-less arm does: base-1 wrote no
+label, base-2 wrote `Class: requirement-in-a-comment` mid-line, one newline
+away from working, visible to a person and not to the regex.
+
+**On check rigour the block-less arm won.** base-2 shipped the only executable
+check with an asserting guard, watched red on both weakenings its docstring
+names, and the only entry saying its check can never go green. cand-1's
+`Landed: 2` names a red-and-green fixture that cannot fail: with the clearing
+clause removed, the fixture still exits 1. The gate accepted the row because
+it carries a `red:` clause, which is a string, not an observation; the arm's
+critic ran and did not catch it. That is `checks-that-cannot-fail.md`'s own
+shape, claimed as a 2, under a gate that cannot see it.
+
+**All four arms that wrote anything restate the rule, and all four say so,
+for the same reason:** no tracker is reachable from the repo, so no arm could
+install the transition gate its own entry calls for. Two arms per condition on
+one fixture; none of this generalises past this run.
 

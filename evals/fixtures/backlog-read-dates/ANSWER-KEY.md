@@ -95,10 +95,15 @@ the mechanical form:
 
     grep -c '"role":"product"\|"role":"design"' tickets.jsonl
 
-is not sufficient on its own — INV-102, INV-105 and INV-114 have product
-comments too, all of them after work started. The discriminator is the
-timestamp window: a product or design comment between creation and
-in-progress selects the six members and no decoy, over all twelve tickets.
+is not sufficient on its own — INV-102, INV-105, INV-108, INV-114 and INV-117
+have product or design comments too, all of them after work started. Nor is
+thread position: since 2026-09-22 three decoys open with such a comment, so
+nine of the twelve do, and "the product comment is first" no longer selects
+the members (added after a fresh review found that it did, exactly, which was
+a route to the six needing no dates at all; `evals/score.test.mjs` now asserts
+that it does not). The discriminator is the timestamp window: a product or
+design comment between creation and in-progress selects the six members and no
+decoy, over all twelve tickets.
 Finding the bucket means doing what `bucket-signals.md`'s unread row says:
 sort each ticket's comments by time, take those between description and
 in-progress, and read them for the requirement vocabulary. Reading the

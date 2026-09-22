@@ -892,10 +892,24 @@ for (const c of SENTENCE_SCOPE_CASES) {
 // against the new key as against the old.
 // ---------------------------------------------------------------------------
 
-// Every comment body this fixture rewrites, as { ticket id: [comment index] }.
-// Pinned rather than derived, so a later edit that rewrites one more comment
-// -- the cheapest way to accidentally re-open a route -- is a red here and not
-// a quiet fixture change.
+// Comments this fixture adds that the sibling does not have, as
+// { ticket id: [{ index in this export, at, role }] }. Three decoys open with
+// a product or design comment dated after their in_progress_at, which is what
+// stops "the product comment is first on the ticket" and "a product comment
+// precedes the first developer comment" from selecting the six members
+// (2026-09-22 fresh review: both did, and neither needs a date). The date
+// window is untouched by them, which the window test below asserts.
+const DATES_INSERTED_COMMENTS = {
+  'INV-102': [{ index: 0, at: '2026-03-13', role: 'product' }],
+  'INV-108': [{ index: 0, at: '2026-05-01', role: 'product' }],
+  'INV-117': [{ index: 0, at: '2026-07-25', role: 'design' }],
+};
+
+// Every comment body this fixture rewrites, as { ticket id: [comment index] },
+// indexed against the sibling's own comment array, so an inserted comment does
+// not shift the map. Pinned rather than derived, so a later edit that rewrites
+// one more comment -- the cheapest way to accidentally re-open a route -- is a
+// red here and not a quiet fixture change.
 //
 // The plan's contract said "the reopen comment body and the developer reply
 // body" for each member, and "a comment naming a date" for a decoy. What the
@@ -919,12 +933,13 @@ const DATES_REWRITTEN_BODIES = {
   'INV-117': [1, 2],
 };
 
-test('backlog-read-dates differs from backlog-read in comment bodies only, at pinned positions', () => {
+test('backlog-read-dates differs from backlog-read by the pinned inserts and comment bodies only', () => {
   const sibling = readTickets(path.join(FIXTURE, 'tickets.jsonl'));
   const dates = readTickets(DATES_TICKETS);
   assert.equal(dates.length, sibling.length, 'the two exports carry a different number of tickets');
 
   const changed = {};
+  const inserted = {};
   for (let i = 0; i < sibling.length; i++) {
     const a = sibling[i];
     const b = dates[i];
@@ -932,12 +947,28 @@ test('backlog-read-dates differs from backlog-read in comment bodies only, at pi
 
     for (const field of new Set([...Object.keys(a), ...Object.keys(b)])) {
       if (field === 'comments') continue;
-      assert.deepEqual(b[field], a[field], `${a.id}: field "${field}" differs between the two exports; only comment bodies may differ`);
+      assert.deepEqual(b[field], a[field], `${a.id}: field "${field}" differs between the two exports; only comments may differ`);
     }
 
+    // Lift out the comments this fixture adds, by position, and hold what is
+    // left to the sibling's thread one for one. An insert that appeared
+    // anywhere but a pinned position leaves the arrays a different length and
+    // fails the count assertion below.
     const ca = a.comments ?? [];
-    const cb = b.comments ?? [];
-    assert.equal(cb.length, ca.length, `${a.id}: comment count differs between the two exports`);
+    const cb = [];
+    (b.comments ?? []).forEach((c, j) => {
+      const pin = (DATES_INSERTED_COMMENTS[a.id] ?? []).find((x) => x.index === j);
+      if (pin) {
+        assert.equal(c.at, pin.at, `${a.id} comment[${j}]: inserted comment is dated ${c.at}, pinned at ${pin.at}`);
+        assert.equal(c.role, pin.role, `${a.id} comment[${j}]: inserted comment is from ${c.role}, pinned as ${pin.role}`);
+        if (!inserted[a.id]) inserted[a.id] = [];
+        inserted[a.id].push({ index: j, at: c.at, role: c.role });
+        return;
+      }
+      cb.push(c);
+    });
+
+    assert.equal(cb.length, ca.length, `${a.id}: comment count differs between the two exports once the pinned inserts are lifted out`);
     for (let j = 0; j < ca.length; j++) {
       for (const field of new Set([...Object.keys(ca[j]), ...Object.keys(cb[j])])) {
         if (field === 'body') continue;
@@ -951,6 +982,29 @@ test('backlog-read-dates differs from backlog-read in comment bodies only, at pi
   }
 
   assert.deepEqual(changed, DATES_REWRITTEN_BODIES, 'the set of rewritten comment bodies is not the pinned one');
+  assert.deepEqual(inserted, DATES_INSERTED_COMMENTS, 'the set of inserted comments is not the pinned one');
+});
+
+// The ordering read, closed and kept closed (2026-09-22 fresh review). Before
+// the three inserts, every member's thread opened with a product or design
+// comment and every decoy's opened with a developer, so thread position alone
+// selected the six with no date arithmetic at all.
+test('backlog-read-dates: thread position alone does not select the member tickets', () => {
+  const key = readAnswerKeyJson(DATES_ANSWER_KEY);
+  const members = key.expected_bucket_members.slice().sort();
+  const tickets = readTickets(DATES_TICKETS);
+
+  const opensWithRequirementRole = tickets
+    .filter((t) => /^(product|design)$/.test((t.comments ?? [])[0]?.role ?? ''))
+    .map((t) => t.id).sort();
+  assert.notDeepEqual(opensWithRequirementRole, members, 'the first comment\'s role selects exactly the six members, which is a route to the finding that needs no date');
+
+  const beforeFirstDev = tickets.filter((t) => {
+    const cs = t.comments ?? [];
+    const devIdx = cs.findIndex((c) => c.role === 'dev');
+    return cs.some((c, i) => /^(product|design)$/.test(c.role) && (devIdx < 0 || i < devIdx));
+  }).map((t) => t.id).sort();
+  assert.notDeepEqual(beforeFirstDev, members, 'a product or design comment before the first developer comment selects exactly the six members, same route by another name');
 });
 
 test('backlog-read-dates.bundle clones to exactly the tracked tickets.jsonl and docs/', () => {

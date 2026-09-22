@@ -48,33 +48,39 @@ comparing a date. A fixture that hands over its own finding cannot measure
 whether the skill's procedure reaches it, which is now the rule in
 `evals/README.md`: a fixture may not state its finding.
 
-Here both routes are closed. Only comment bodies differ from the sibling, at
-eighteen positions, ten on the members and eight on the decoys. On four
-members it is the reopen comment and the developer reply; on INV-104 and
-INV-110 only the reply, since their reopen comments named nothing to remove.
-On the decoys it is whichever comment stated a bucket, one each on INV-102,
-INV-105, INV-108 and INV-111 and two each on INV-114 and INV-117.
-`evals/score.test.mjs` pins that set field by field, so a later edit cannot
-quietly change a date, a role or a ticket's structure. What is left is the
-date window: on every member a product or design comment sits strictly between
-`created_at` and `in_progress_at` and carries a requirement, and on no decoy
-does one.
+Here both routes are closed. Eighteen comment bodies differ from the sibling,
+ten on the members and eight on the decoys. On four members it is the reopen
+comment and the developer reply; on INV-104 and INV-110 only the reply, since
+their reopen comments named nothing to remove. On the decoys it is whichever
+comment stated a bucket, one each on INV-102, INV-105, INV-108 and INV-111 and
+two each on INV-114 and INV-117. `evals/score.test.mjs` pins that set field by
+field, so a later edit cannot quietly change a date, a role or a ticket's
+structure. What is left is the date window: on every member a product or design
+comment sits strictly between `created_at` and `in_progress_at` and carries a
+requirement, and on no decoy does one.
+
+A third route was open until 2026-09-22, and was closed by adding three
+comments rather than by rewording any. A fresh review of the built fixture
+found that every member's thread opened with a product or design comment while
+every decoy's opened with a developer, so thread position alone selected the
+six, with no date arithmetic and no reading of what any comment said. The
+export now gives INV-102, INV-108 and INV-117 a product or design comment at
+the head of the thread, each dated after that ticket's `in_progress_at`: nine
+tickets open that way, six are members, and the position tells the reader
+nothing. The date window is untouched, because none of the three sits between
+creation and in-progress. `evals/score.test.mjs` asserts both halves of that,
+the window selecting exactly the six and position selecting something else.
+
+This is the fixture's own lesson applied to itself. The route was not in the
+plan, not in the answer key and not in the first review's remit; it was found
+by someone reading the built export cold and asking what else separates the
+six.
 
 A cold reader who received `tickets.jsonl`, `docs/` and the prompt, with the
-skill not loaded, found the six by that comparison (recorded in
-`PREREGISTRATION.md`). So the evidence is reachable without a confession, and
-reachable without the skill.
-
-There is a second way to the same six, found by a fresh review of this fixture
-on 2026-09-22 and not by its build: on every member the product or design
-comment is the first comment on the ticket, and on every decoy the thread
-opens with a developer. Thread position alone therefore selects the six, with
-no date arithmetic. It carries the same evidence the date window does, since
-"first on the ticket" and "before work started" are the same fact read two
-ways, so it is not a confession in the sense the fixture rules use. It does
-mean "the only route" would be the wrong thing to say about the date window,
-and a run graded on whether the arm compared dates has to accept the
-positional form of the same comparison.
+skill not loaded, found the six by the date comparison (recorded in
+`PREREGISTRATION.md`, re-run on this export after the three comments were
+added). So the evidence is reachable without a confession, and reachable
+without the skill.
 
 ## Why JSONL and not CSV or `gh` text
 
@@ -100,6 +106,11 @@ refused with `deny_sweep_command_failed` on both sweep lines.
   was in. That is the point of this variant, and it is itself artificial: real
   reopen threads sometimes do confess, and a real export would carry a mix.
   This fixture is the floor, not the average.
+- Three decoys carry a product or design comment at the head of the thread
+  that exists to break the ordering tell described above. They are ordinary
+  context notes, dated after work started, and they add no requirement. A real
+  export's ordering would be mixed for its own reasons; here it is mixed on
+  purpose.
 - `in_progress_at` is a clean field on every ticket, as are `found_by` and
   `reopen_count`. A real tracker carries the first as a status-history row or
   not at all. With the confessions gone this is the fixture's one remaining

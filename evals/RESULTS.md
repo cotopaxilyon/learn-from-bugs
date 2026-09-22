@@ -601,3 +601,78 @@ reason; it is recorded here as a lead, not a result.
 Google Drive need authorising in connector settings. Operator configuration
 reached an arm's reply. It changed nothing here, and an arm is not a clean
 room.
+
+### Run 12 addendum: a fresh reader graded the artifacts
+
+Same shape as run 11's grading. A reader with no part in the run read what
+each arm left on disk against four questions (mechanism claimed against
+mechanism earned, retrieval, closes or restates, what still passes) plus two
+comparisons, and was asked to hunt for this run's version of run 11's
+unsupported claim. It recomputed the fixture's own counts before grading
+anything.
+
+**No arm repeated run 11's failure.** Neither candidate entry claims a check,
+claims one was watched failing, or uses `red:` at all. cand-1 states the
+opposite in the entry: "This is template and DoD text, not a check, and
+nothing enforces it yet... It has not been built." The `red:` lead
+(`dolly-xkt4dq`) stays where run 11 left it, not recurred.
+
+**Both candidate arms mis-numbered a mechanism, in opposite directions.**
+cand-2's `Landed: 6` claims a relocation, which is a requirement moved out of
+a comment and into the description; nothing was relocated, the template gained
+an instruction to relocate in future, which is mechanism 3. cand-1's
+`Landed: 4` claims a template question; the diff adds declarative prose and
+the row's own verb says so ("template states"), which is again 3.
+`land-a-change.md` already rules on this ("where they disagree, the number
+follows what you built") and the gate cannot see it: any integer 1 to 10 is
+accepted with no relation to the diff. That is the same shape as run 11's
+`red:` lead, one level up, and it is now two arms out of two.
+
+**cand-1 is the stronger record, and its entry reached disk by the one path
+the gate cannot see.** It changed two lifecycle moments rather than one, its
+definition-of-done row cleanly earns mechanism 5, it binds eleven of the
+twelve tickets to a symptom in plain words, and it states its own limits
+twice. It wrote the final entry with a `python3` heredoc through Bash, after
+drafting through Edit. SKILL.md names that path itself: "A write from the
+shell bypasses it." Verified here rather than assumed: the reader believed no
+hook was live in either clone, and a probe refutes that half of it. An
+installed plugin's gate does fire in a directory with no `.claude` of its own,
+in block mode (a bare entry written by Write in a scratch directory was
+refused, naming the nine missing fields). So cand-2's entry was gate-checked
+and cand-1's final one was not.
+
+**cand-2 removed the only change sitting where the escapes happened.** Its own
+critic said the definition-of-done line was in the wrong place to act as a
+gate, and the arm deleted that change rather than moving it. INV-104 and
+INV-110, the two that reached customers, both passed QA close with "Matches
+AC" and "Passes AC". cand-2's remaining change is a checkbox at In Progress,
+ticked by the developer. A critic pass made the record worse at the one moment
+the evidence points to.
+
+**The four arms that wrote nothing were not weaker analysts.** base-1 proposed
+the best single change of the six, a readback in which the developer rewrites
+the acceptance criteria from everything on the ticket and the comment author
+signs off, which covers the requirement-in-a-comment members and the
+two-meanings decoys together, and it volunteered its own gap. base-2 was the
+only arm to name the mechanical check and say why the export cannot support
+it. Both no-skill arms caught something no other arm did, that INV-105 closed
+`fixed` with its fix deferred in the last comment.
+
+**What their silence costs is specific.** The template and the definition of
+done are byte-identical to HEAD in all four clones, so the next ticket is
+written from the document that produced the failure. The log they all
+identified as empty is still empty, so the next periodic read starts from
+zero. The six ticket ids are bound to nothing: both 1.1.0 arms proposed a
+cause label and neither applied one. And the retrieval is unreproducible,
+since the candidate entries carry a `Window:` command a later reader can
+re-run while the chat answers carry the conclusions of a query that exists
+only in a transcript nobody will open. The cut runs both ways and the reader
+said so: base-1's "6 of 12 tickets have no label" is wrong, it is 5, and
+base-0b's "7 weeks" is 6. Those evaporate with the session, where cand-1's
+mis-numbered row is now permanent.
+
+**base-2's own loss is the sharpest illustration.** It ran a verification
+subagent, got two corrections, folded them into its chat answer and reported
+"one claim needed correcting". The correction improved the answer and vanished
+with it. On the candidate arms the equivalent correction is on disk, as the
+difference between the drafted entry and the final one.

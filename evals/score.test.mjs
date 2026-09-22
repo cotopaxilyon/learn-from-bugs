@@ -28,13 +28,16 @@ function git(args, cwd) {
 // A fresh arm the way an agent's own working tree looks going into the
 // session: tickets.jsonl and the docs folder committed, docs/LESSONS.md
 // carrying only its shipped header, nothing about this run's entry yet.
-function buildArm() {
+// Takes the fixture directory so the dates variant, whose docs/ is a copy of
+// this one's and whose tickets.jsonl is not, builds its arm through the same
+// path rather than a second copy of it.
+function buildArm(fixture = FIXTURE) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backlog-read-arm-'));
-  fs.copyFileSync(path.join(FIXTURE, 'tickets.jsonl'), path.join(dir, 'tickets.jsonl'));
+  fs.copyFileSync(path.join(fixture, 'tickets.jsonl'), path.join(dir, 'tickets.jsonl'));
   fs.mkdirSync(path.join(dir, 'docs'));
-  fs.copyFileSync(path.join(FIXTURE, 'docs', 'ticket-template.md'), path.join(dir, 'docs', 'ticket-template.md'));
-  fs.copyFileSync(path.join(FIXTURE, 'docs', 'definition-of-done.md'), path.join(dir, 'docs', 'definition-of-done.md'));
-  fs.writeFileSync(path.join(dir, 'docs', 'LESSONS.md'), LOG_HEADER);
+  fs.copyFileSync(path.join(fixture, 'docs', 'ticket-template.md'), path.join(dir, 'docs', 'ticket-template.md'));
+  fs.copyFileSync(path.join(fixture, 'docs', 'definition-of-done.md'), path.join(dir, 'docs', 'definition-of-done.md'));
+  fs.writeFileSync(path.join(dir, 'docs', 'LESSONS.md'), fs.readFileSync(path.join(fixture, 'docs', 'LESSONS.md'), 'utf8'));
   git(['init', '-q'], dir);
   git(['config', 'user.email', 'test@example.com'], dir);
   git(['config', 'user.name', 'backlog-read test'], dir);
@@ -79,8 +82,8 @@ function denyDetails(result) {
   return [...reason.matchAll(/^\s*\[deny_[a-z_]+\] [^:]+: (.+)$/gm)].map((m) => m[1]);
 }
 
-function runScore(dir, transcriptPath) {
-  const out = execFileSync('node', [SCORE, dir, transcriptPath, ANSWER_KEY], { encoding: 'utf8' });
+function runScore(dir, transcriptPath, answerKey = ANSWER_KEY) {
+  const out = execFileSync('node', [SCORE, dir, transcriptPath, answerKey], { encoding: 'utf8' });
   return JSON.parse(out);
 }
 
@@ -261,52 +264,60 @@ const CASES = [
   },
 ];
 
+// One case, run against one fixture. Parameterised so the dates variant's two
+// hand entries (below, near its own fixture's tests) assert the same
+// expectation objects these do rather than a retyped copy of them: "the same
+// values against the new key as against the old" is then a property of the
+// code, not of two lists agreeing.
+function runHandEntryCase(t, c, fixture = FIXTURE, answerKey = ANSWER_KEY) {
+  const dir = buildArm(fixture);
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const entryText = fs.readFileSync(path.join(fixture, 'hand', `${c.name}.md`), 'utf8');
+  const logPath = path.join(dir, 'docs', 'LESSONS.md');
+  const logHeader = fs.readFileSync(path.join(fixture, 'docs', 'LESSONS.md'), 'utf8');
+  const proposed = `${logHeader}\n${entryText}`;
+
+  // correct.md's Landed: row ends in docs/ticket-template.md, so that path
+  // has to be a real, uncommitted change here before the dry run, or the
+  // gate has nothing to call touched — a bare mtime touch would not do it,
+  // since git compares content, not mtime.
+  if (c.touchTemplate) {
+    fs.appendFileSync(path.join(dir, 'docs', 'ticket-template.md'), '\n<!-- comment-promotion reviewed -->\n');
+  }
+
+  // Dry run before the drive run.
+  const decision = decide(
+    { tool_name: 'Write', tool_input: { file_path: logPath, content: proposed }, cwd: dir },
+    { ...process.env, LFB_LEDGER_MODE: 'block' },
+  );
+  // Asserted for every entry, not only the clean one: a boolean that only
+  // fired when true let the other three drift unobserved (review F9).
+  // Two entries (no block at all) assert the sorted detail strings instead
+  // of nine copies of one code, which cannot tell one missing field from
+  // another.
+  if (c.expectDenyDetails) {
+    const details = denyDetails(decision).slice().sort();
+    assert.deepEqual(details, c.expectDenyDetails, `${c.name}.md: deny details expected ${JSON.stringify(c.expectDenyDetails)}, got ${JSON.stringify(details)}`);
+  } else {
+    const codes = denyCodes(decision);
+    assert.deepEqual(codes, c.expectDenies, `${c.name}.md: gate codes expected ${JSON.stringify(c.expectDenies)}, got ${JSON.stringify(codes)}`);
+  }
+
+  // Physically write the entry the dry run proposed, uncommitted, then
+  // score it the way the drive harness would.
+  fs.writeFileSync(logPath, proposed);
+  const transcriptPath = writeTranscript(dir, c.name);
+  const result = runScore(dir, transcriptPath, answerKey);
+
+  for (const [key, value] of Object.entries(c.expect)) {
+    const got = getPath(result, key);
+    assert.deepEqual(got, value, `${c.name}.md: ${key} expected ${JSON.stringify(value)}, got ${JSON.stringify(got)}`);
+  }
+}
+
 for (const c of CASES) {
-  test(`backlog-read hand entry: ${c.name}`, (t) => {
-    const dir = buildArm();
-    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-
-    const entryText = fs.readFileSync(path.join(FIXTURE, 'hand', `${c.name}.md`), 'utf8');
-    const logPath = path.join(dir, 'docs', 'LESSONS.md');
-    const proposed = `${LOG_HEADER}\n${entryText}`;
-
-    // correct.md's Landed: row ends in docs/ticket-template.md, so that path
-    // has to be a real, uncommitted change here before the dry run, or the
-    // gate has nothing to call touched — a bare mtime touch would not do it,
-    // since git compares content, not mtime.
-    if (c.touchTemplate) {
-      fs.appendFileSync(path.join(dir, 'docs', 'ticket-template.md'), '\n<!-- comment-promotion reviewed -->\n');
-    }
-
-    // Dry run before the drive run.
-    const decision = decide(
-      { tool_name: 'Write', tool_input: { file_path: logPath, content: proposed }, cwd: dir },
-      { ...process.env, LFB_LEDGER_MODE: 'block' },
-    );
-    // Asserted for every entry, not only the clean one: a boolean that only
-    // fired when true let the other three drift unobserved (review F9).
-    // Two entries (no block at all) assert the sorted detail strings instead
-    // of nine copies of one code, which cannot tell one missing field from
-    // another.
-    if (c.expectDenyDetails) {
-      const details = denyDetails(decision).slice().sort();
-      assert.deepEqual(details, c.expectDenyDetails, `${c.name}.md: deny details expected ${JSON.stringify(c.expectDenyDetails)}, got ${JSON.stringify(details)}`);
-    } else {
-      const codes = denyCodes(decision);
-      assert.deepEqual(codes, c.expectDenies, `${c.name}.md: gate codes expected ${JSON.stringify(c.expectDenies)}, got ${JSON.stringify(codes)}`);
-    }
-
-    // Physically write the entry the dry run proposed, uncommitted, then
-    // score it the way the drive harness would.
-    fs.writeFileSync(logPath, proposed);
-    const transcriptPath = writeTranscript(dir, c.name);
-    const result = runScore(dir, transcriptPath);
-
-    for (const [key, value] of Object.entries(c.expect)) {
-      const got = getPath(result, key);
-      assert.deepEqual(got, value, `${c.name}.md: ${key} expected ${JSON.stringify(value)}, got ${JSON.stringify(got)}`);
-    }
-  });
+  test(`backlog-read hand entry: ${c.name}`, (t) => runHandEntryCase(t, c));
 }
 
 // Reported-value regression cover, 2026-09-11 re-verdict. bucket_in_prose,
@@ -448,21 +459,28 @@ test('backlog-read: critic_unsupported and entries_in_log', () => {
 // same tree by build-bundle.sh; this holds them to it, so an edit to either
 // without a rebuild is a red here rather than a fixture that quietly differs
 // from its own test. The clone also proves the README's restore command.
-test('backlog-read.bundle clones to exactly the tracked tickets.jsonl and docs/', () => {
-  const bundle = path.join(FIXTURE, 'backlog-read.bundle');
-  assert.ok(fs.existsSync(bundle), 'backlog-read.bundle is missing; run evals/fixtures/backlog-read/build-bundle.sh');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backlog-read-clone-'));
+// Parameterised by fixture, not copied per fixture: backlog-read-dates ships
+// the same two files through the same build script, and a second copy of this
+// assertion would be a second place to forget.
+function assertBundleParity(fixtureDir, fixtureName) {
+  const bundle = path.join(fixtureDir, `${fixtureName}.bundle`);
+  assert.ok(fs.existsSync(bundle), `${fixtureName}.bundle is missing; run evals/fixtures/${fixtureName}/build-bundle.sh`);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${fixtureName}-clone-`));
   execFileSync('git', ['clone', '-q', bundle, path.join(dir, 'work')], { encoding: 'utf8' });
   const work = path.join(dir, 'work');
   const shipped = execFileSync('git', ['-C', work, 'ls-files'], { encoding: 'utf8' }).trim().split('\n').sort();
-  const expected = ['tickets.jsonl', ...fs.readdirSync(path.join(FIXTURE, 'docs')).map((f) => `docs/${f}`)].sort();
+  const expected = ['tickets.jsonl', ...fs.readdirSync(path.join(fixtureDir, 'docs')).map((f) => `docs/${f}`)].sort();
   assert.deepEqual(shipped, expected);
   for (const f of shipped) {
-    assert.equal(fs.readFileSync(path.join(work, f), 'utf8'), fs.readFileSync(path.join(FIXTURE, f), 'utf8'), `${f} in the bundle differs from the tracked file`);
+    assert.equal(fs.readFileSync(path.join(work, f), 'utf8'), fs.readFileSync(path.join(fixtureDir, f), 'utf8'), `${f} in the bundle differs from the tracked file`);
   }
   const day = execFileSync('git', ['-C', work, 'log', '--date=short', '--format=%ad'], { encoding: 'utf8' }).trim();
   assert.equal(day, '2026-08-10', 'the bundle has one commit, dated to the log header');
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+test('backlog-read.bundle clones to exactly the tracked tickets.jsonl and docs/', () => {
+  assertBundleParity(FIXTURE, 'backlog-read');
 });
 
 test('no label in tickets.jsonl groups more tickets than expected_symptom_themes_max_size allows', () => {
@@ -862,3 +880,137 @@ for (const c of SENTENCE_SCOPE_CASES) {
     assert.ok(hitsInBucket(c.truePositive, c.bucket).length > 0, `expected the real ${c.bucket} text to still register as a confession`);
   });
 }
+
+// ---------------------------------------------------------------------------
+// backlog-read-dates: the dates-only variant's own build checks.
+//
+// The no-confession check above already governs this fixture (its answer key
+// carries confession_phrases, so governedFixtures() picks it up). What follows
+// is the rest of its build: that it differs from the sibling in comment
+// bodies and nothing else, that its bundle matches its tracked files, and that
+// the two hand entries carried over from the sibling score the same values
+// against the new key as against the old.
+// ---------------------------------------------------------------------------
+
+// Every comment body this fixture rewrites, as { ticket id: [comment index] }.
+// Pinned rather than derived, so a later edit that rewrites one more comment
+// -- the cheapest way to accidentally re-open a route -- is a red here and not
+// a quiet fixture change.
+//
+// The plan's contract said "the reopen comment body and the developer reply
+// body" for each member, and "a comment naming a date" for a decoy. What the
+// build actually did is wider on the decoy side and narrower on two members:
+// INV-104 and INV-110 needed only their developer reply rewritten, and every
+// decoy needed the comment that stated its own bucket removed, per the
+// maintainer ruling that a fixture may not state ANY bucket. This map is the
+// build as it stands, not as it was specified.
+const DATES_REWRITTEN_BODIES = {
+  'INV-101': [2, 3],
+  'INV-102': [3],
+  'INV-104': [4],
+  'INV-105': [2],
+  'INV-107': [2, 3],
+  'INV-108': [1],
+  'INV-110': [4],
+  'INV-111': [3],
+  'INV-113': [2, 3],
+  'INV-114': [2, 3],
+  'INV-116': [2, 3],
+  'INV-117': [1, 2],
+};
+
+test('backlog-read-dates differs from backlog-read in comment bodies only, at pinned positions', () => {
+  const sibling = readTickets(path.join(FIXTURE, 'tickets.jsonl'));
+  const dates = readTickets(DATES_TICKETS);
+  assert.equal(dates.length, sibling.length, 'the two exports carry a different number of tickets');
+
+  const changed = {};
+  for (let i = 0; i < sibling.length; i++) {
+    const a = sibling[i];
+    const b = dates[i];
+    assert.equal(b.id, a.id, `ticket ${i} is ${b.id} in backlog-read-dates and ${a.id} in backlog-read; the order is part of the export`);
+
+    for (const field of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (field === 'comments') continue;
+      assert.deepEqual(b[field], a[field], `${a.id}: field "${field}" differs between the two exports; only comment bodies may differ`);
+    }
+
+    const ca = a.comments ?? [];
+    const cb = b.comments ?? [];
+    assert.equal(cb.length, ca.length, `${a.id}: comment count differs between the two exports`);
+    for (let j = 0; j < ca.length; j++) {
+      for (const field of new Set([...Object.keys(ca[j]), ...Object.keys(cb[j])])) {
+        if (field === 'body') continue;
+        assert.deepEqual(cb[j][field], ca[j][field], `${a.id} comment[${j}]: field "${field}" differs; the date window the fixture turns on is built from "at" and "role"`);
+      }
+      if (cb[j].body !== ca[j].body) {
+        if (!changed[a.id]) changed[a.id] = [];
+        changed[a.id].push(j);
+      }
+    }
+  }
+
+  assert.deepEqual(changed, DATES_REWRITTEN_BODIES, 'the set of rewritten comment bodies is not the pinned one');
+});
+
+test('backlog-read-dates.bundle clones to exactly the tracked tickets.jsonl and docs/', () => {
+  assertBundleParity(DATES_FIXTURE, 'backlog-read-dates');
+});
+
+test('backlog-read-dates ships the same docs/ as backlog-read', () => {
+  const files = fs.readdirSync(path.join(FIXTURE, 'docs')).sort();
+  assert.deepEqual(fs.readdirSync(path.join(DATES_FIXTURE, 'docs')).sort(), files);
+  for (const f of files) {
+    assert.equal(
+      fs.readFileSync(path.join(DATES_FIXTURE, 'docs', f), 'utf8'),
+      fs.readFileSync(path.join(FIXTURE, 'docs', f), 'utf8'),
+      `docs/${f} differs between the two fixtures; the variant changes the export, not the docs an arm lands on`,
+    );
+  }
+});
+
+// "correct.md and prose-only.md score the same values against the new key as
+// against the old" -- the plan's own test line. The expectation objects are
+// the sibling's, read out of CASES by name, so neither list can be edited to
+// agree with the other.
+// The block is what carries over byte for byte; the prose above it does not,
+// and asserting that it did was itself a defect (2026-09-22 fresh review).
+// correct.md's sibling prose cites the reopen notes as saying the comment went
+// unseen, which is true of backlog-read and false here -- this batch is what
+// removed that wording from the export. The dates copy cites the only evidence
+// its own export carries, the comment dates, so the fixture's worked correct
+// answer does not claim an observation a reader cannot make.
+for (const name of ['correct', 'prose-only']) {
+  const c = CASES.find((x) => x.name === name);
+  test(`backlog-read-dates hand entry: ${name} scores as it does on the sibling`, (t) => {
+    assert.ok(c, `${name} is no longer one of the sibling's CASES`);
+    const here = fs.readFileSync(path.join(DATES_FIXTURE, 'hand', `${name}.md`), 'utf8');
+    const there = fs.readFileSync(path.join(FIXTURE, 'hand', `${name}.md`), 'utf8');
+    if (name === 'prose-only') {
+      assert.equal(here, there, 'hand/prose-only.md is a copy on purpose: it carries no block, and its prose cites no confession either way');
+    } else {
+      const block = (text) => text.slice(text.indexOf('Theme:'));
+      assert.equal(block(here), block(there), `hand/${name}.md's block differs between the fixtures; the block does not depend on which export it is written against`);
+      assert.doesNotMatch(here, /went unseen|did not see|never saw/i, `hand/${name}.md cites a confession this fixture's export does not carry`);
+    }
+    runHandEntryCase(t, c, DATES_FIXTURE, DATES_ANSWER_KEY);
+  });
+}
+
+// The property the whole fixture turns on, asserted rather than assumed
+// (2026-09-22 fresh review): a coordinated edit moving one member's product
+// comment past its in_progress_at, in both exports at once, left all 33 tests
+// green while destroying that member's only intended route. The field diff
+// pins this fixture's dates to the sibling's, and the sibling's dates are
+// pinned nowhere.
+test('backlog-read-dates: the created_at/in_progress_at window selects exactly the member tickets', () => {
+  const key = readAnswerKeyJson(DATES_ANSWER_KEY);
+  const selected = readTickets(DATES_TICKETS)
+    .filter((t) => (t.comments ?? []).some((c) => /^(product|design)$/.test(c.role) && c.at > t.created_at && c.at < t.in_progress_at))
+    .map((t) => t.id);
+  assert.deepEqual(
+    selected.slice().sort(),
+    key.expected_bucket_members.slice().sort(),
+    'the date window no longer selects the six members and only them; either a comment date moved or a ticket\'s in_progress_at did, and the fixture\'s intended route is gone',
+  );
+});

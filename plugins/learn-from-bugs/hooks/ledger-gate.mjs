@@ -503,7 +503,7 @@ function landedRows({ body, fails, cwd, env, logPath, requireReferent }) {
       // 4 is the one number whose claim the diff can show. The rest are the
       // author's word: a red check is green by the time the entry is written,
       // and a relocation's origin is usually somewhere the repo cannot see.
-      fails.push({ code: 'deny_landed_question_not_added', detail: `Landed: 4 claims a question added to a template, but nothing this work added to "${tail}" asks one (no "?" and no "- [ ]" line). Claim 3, a written-down rule, or add the question.` });
+      fails.push({ code: 'deny_landed_question_not_added', detail: `Landed: 4 claims a question added to a template, but nothing this work added to "${tail}" asks one (no line with a "?" ending a phrase, and no "- [ ]" box). Claim 3, a written-down rule, or add the question.` });
     }
   }
 }

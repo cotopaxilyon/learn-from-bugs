@@ -13,8 +13,9 @@ which is the item's opening clause. **Where they disagree, the number follows
 what you built**, because that is what the number claims and what a later
 altitude read is counting. A rule that had lived in a conversation and now lives
 in one exported function is a relocation, 6, even though the gap it answers is
-the one item 7 names: what shipped is the relocation. Nothing here is a check, so
-two people can still land on different numbers; the tie-break is the one above:
+the one item 7 names: what shipped is the relocation. Only a 4 is checked
+against what you built (see below the list), so two people can still land on different numbers; the
+tie-break is the one above:
 
 
 
@@ -43,6 +44,15 @@ two people can still land on different numbers; the tie-break is the one above:
 10. a signal (an assertion that throws, a log line, an alert) when the gap was
     that nothing would have told you. For anything a user reported, ship this as
     well as the prevention, since prevention and detection fail independently.
+
+On a theme entry, the gate reads a 4 row's referent: what this work added to
+that file has to ask something, a question mark ending a phrase or an unticked
+`- [ ]` box, or the row is refused and the message offers 3 or adding the
+question. Every other number is taken as your claim, beyond the `red:` a 1 or 2
+must carry. A red check is green by the time the entry is written, and a
+relocation's origin is usually a comment or a conversation the repo cannot see,
+so the gate does not rule on what those numbers claim, and a later read of the
+log should not count them as verified.
 
 Whatever you pick from the top three, read `checks-that-cannot-fail.md` in the
 same sitting, since a check nobody has observed failing is not yet a gate.

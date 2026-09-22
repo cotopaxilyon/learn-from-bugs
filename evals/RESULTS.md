@@ -502,3 +502,102 @@ for the same reason:** no tracker is reachable from the repo, so no arm could
 install the transition gate its own entry calls for. Two arms per condition on
 one fixture; none of this generalises past this run.
 
+
+## Run 12, 2026-09-22, Opus, the periodic read on the backlog-read-dates fixture
+
+The dates-only variant, built to answer what run 11 could not: its sibling
+handed every arm the diagnosis in a confession, so nothing that run measured
+bore on whether the skill's procedure reaches a finding. Here no comment
+states a bucket, and the route to the six members is the comment date against
+`in_progress_at`. Six arms, one `claude -p` each in a fresh clone of
+`evals/fixtures/backlog-read-dates/backlog-read-dates.bundle`, prompt verbatim
+from the fixture README. cand-1 and cand-2 with the installed 1.3.1. base-1
+and base-2 with the plugin disabled through the clone's own
+`.claude/settings.json` and the 1.1.0 copy in `.claude/skills`. base-0a and
+base-0b with the plugin disabled and nothing loaded. Every arm verified before
+the run to see the skill it was supposed to see, and no other.
+`--model claude-opus-5 --permission-mode acceptEdits --allowedTools
+Bash,Read,Write,Edit,Grep,Glob,Task,Skill`, stream-json, as run 11. All six
+completed; no rate limit and no refusal.
+
+Read against `PREREGISTRATION.md`, whose three questions, readings and
+consequent actions were written before the first arm (plan §8b). Hand-graded
+columns are mine (the agent running the session, initials AG); the user did
+not grade.
+
+| Signal | cand-1 | cand-2 | base-1 | base-2 | base-0a | base-0b |
+|---|---|---|---|---|---|---|
+| fired | installed | installed | candidate (1.1.0) | candidate (1.1.0) | none | none |
+| completed | yes | yes | yes | yes | yes | yes |
+| turns, cost | 17, $1.40 | 19, $1.28 | 7, $0.57 | 9, $0.80 | 3, $0.29 | 4, $0.31 |
+| wrote an entry | yes | yes | **no** | **no** | **no** | **no** |
+| files touched | log + both docs | log + template | **none** | **none** | **none** | **none** |
+| references opened | 1 | 2 | 1 | 1 | 0 | 0 |
+| `bucket-signals` opened | no | **yes** | n/a | n/a | n/a | n/a |
+| `block_kind` | theme | theme | none | none | none | none |
+| `Window:` ran, count | yes, 12 | yes, 12 | none | none | none | none |
+| `Bucket:` (block) | unread | unread | none | none | none | none |
+| member recall (block) | 1.0 | 1.0 | n/a | n/a | n/a | n/a |
+| decoys misfiled (block) | 0 | 0 | n/a | n/a | n/a | n/a |
+| `Landed:` mechanisms | 4, 5 | 6, 4 | none | none | none | none |
+| expected referents touched | both | template only | none | none | none | none |
+| critic | ran | ran | none | none | none | none |
+| hand-graded `bucket_named` (AG) | n/a, block | n/a, block | unread | unread | unread | unread |
+| hand-graded `members_named` (AG) | n/a, block | n/a, block | 6 | 6 | 6 | 6 |
+
+**Q1, does the model find the finding unaided: yes, six of six, twice.** Both
+arms with nothing loaded named the requirement-in-a-comment shape as the
+finding, listed all six members, dismissed the decoys correctly, and reached
+it the way the answer key says the fixture should be read, by comparing each
+requirement comment's date against when work started. base-0a put the
+comparison in a column of its own table ("days before work started"). Neither
+was asked for its route. Under the pre-registered reading, both `unread` with
+five or more means the diagnosis is not what the skill adds at twelve
+tickets, and the action written before the run applies: no further skill text
+aimed at diagnosis on tracker exports of this size, and 1.3.0's diagnosis
+changes are recorded as unmeasured on outcome. This is now two fixtures and
+eight arms saying the same thing, on the confessing export and on the one
+built to be harder.
+
+**Q2, does the artifact survive when the arm has to work for the diagnosis:
+yes.** Both candidate arms wrote the theme block with `unread`, six of six
+members, no decoy claimed, the `Window:` executed at twelve, and `Landed:`
+rows whose referents resolve to files they had actually changed. The cost the
+question was watching for did not appear: the arms spent their attention on
+the comparison and still wrote the record. Under the pre-registered reading
+the artifact claim holds under load, so the skill's stated value becomes a
+durable, retrievable, landed record of a finding the model can reach, and the
+next skill work is the artifact's rigour rather than its diagnosis.
+
+**The comparison Q2 expected is not available, because the block-less arms
+wrote nothing at all.** In run 11 base-1 and base-2 each left a prose entry
+and edited both docs. Here all four block-less arms answered in chat and
+touched no file, base-1 saying so in its first sentence ("I read all 12
+tickets and wrote nothing to the repo"). Both 1.1.0 arms did open
+`backlog-read.md`, and base-1 read the log as well, so the procedure ran; what
+stopped is the writing. On this run the difference between a candidate arm and every
+other arm is not the quality of the record, it is whether a record exists.
+
+**Q3, do the skill arms use today's procedure: one of two.** cand-2 opened
+`bucket-signals.md`; cand-1 opened only `backlog-read.md`. Neither entry
+shows the two-way tally 1.3.0 added, though both name the date comparison as
+their route in prose. Under the pre-registered reading this is recorded and
+not acted on.
+
+**The three ordering-fix comments were read as evidence.** cand-1's entry
+cites INV-102, INV-108 and INV-117 for the observation that after work starts
+the comment stream is status and priority notes, "which teaches people that
+comments are not where scope lives". Those three comments exist only to stop
+thread position selecting the members. They were added as filler and an arm
+used them as evidence, which is worth knowing about any fixture edit made to
+close a route.
+
+**Both candidate arms scored `rate_observation_as_finding` true.** Both open
+by counting reopens (nine of twelve, six of the nine). Neither treats the rate
+as the finding, and the signal is reported rather than scored for exactly this
+reason; it is recorded here as a lead, not a result.
+
+**One procedural detail.** base-1's answer ends with a note that Gmail and
+Google Drive need authorising in connector settings. Operator configuration
+reached an arm's reply. It changed nothing here, and an arm is not a clean
+room.

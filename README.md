@@ -2,7 +2,8 @@
 
 A Claude Code skill for the moment a bug comes back from testing.
 
-It analyzes the process, using the bug as evidence. The fix is step 2 of 8.
+It turns a finding into a record that outlasts the conversation. The fix is
+step 2 of 8.
 
 The reflex is to fix a QA finding and move on. That fix is the cheap half. The
 blind spot that produced it is still in place, and the bug you found is only the
@@ -11,8 +12,10 @@ instance that happened to be visible.
 One bug rarely carries a diagnosis on its own, either. Nine accessibility bugs
 across four features are not nine mistakes. They are one finding, which is that
 accessibility never enters planning, and fixing them one at a time will not
-change that. So the skill works the issue in front of you and reads it against
-the issues that came before it.
+change that. The ninth bug only reveals that pattern if the first eight were
+recorded somewhere it can be read against them. So the skill works the issue in front of you, reads
+it against the issues that came before it, and leaves a labeled entry the next
+read can find.
 
 ## The eight steps
 

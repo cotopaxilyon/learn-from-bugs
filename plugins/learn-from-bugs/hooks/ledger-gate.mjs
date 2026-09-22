@@ -234,32 +234,69 @@ export function repoRoot(cwd) {
   } catch { return null; }
 }
 
-export function touchedFiles({ cwd, logPath, env = process.env }) {
-  requireCwd(cwd, 'touchedFiles');
+// What counts as this work: the files, and the git arguments that print the
+// change they carry. One function so a referent is read against the same change
+// it was admitted by; touchedFiles and addedLines each kept their own copy of
+// this branching would drift the first time one of them was fixed.
+function thisWork({ cwd, logPath, env = process.env }) {
   const root = repoRoot(cwd) ?? cwd;
   const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const base = logPath ? path.basename(logPath) : logNameFrom(env);
   const clean = (list) => [...new Set(list)].filter((f) => f && path.basename(f) !== base);
+  const head = () => ({ files: clean(git(['show', '--name-only', '--format=', 'HEAD']).split('\n')), diff: ['show', '--format=', 'HEAD'] });
   try {
     const dirty = clean([
       ...git(['diff', '--name-only', 'HEAD']).split('\n'),
       ...git(['diff', '--name-only', '--cached']).split('\n'),
     ]);
-    if (dirty.length) return dirty;
+    if (dirty.length) return { files: dirty, diff: ['diff', 'HEAD'] };
     // Pathspec has to be the repo-relative path: `-- LESSONS.md` does not match
     // `docs/LESSONS.md`. With no logPath there is nothing to measure from, so
     // fall through to HEAD rather than handing git a path outside the repo.
-    if (!logPath) return clean(git(['show', '--name-only', '--format=', 'HEAD']).split('\n'));
+    if (!logPath) return head();
     const rel = path.relative(root, realpath(logPath)) || base;
     const lastLogCommit = git(['log', '-1', '--format=%H', '--', rel]).trim();
     if (lastLogCommit) {
-      const since = clean(git(['diff', '--name-only', `${lastLogCommit}..HEAD`]).split('\n'));
-      if (since.length) return since;
-      return [];
+      const range = `${lastLogCommit}..HEAD`;
+      return { files: clean(git(['diff', '--name-only', range]).split('\n')), diff: ['diff', range] };
     }
-    return clean(git(['show', '--name-only', '--format=', 'HEAD']).split('\n'));
+    return head();
+  } catch { return { files: [], diff: null }; }
+}
+
+export function touchedFiles({ cwd, logPath, env = process.env }) {
+  requireCwd(cwd, 'touchedFiles');
+  return thisWork({ cwd, logPath, env }).files;
+}
+
+// The lines this work added to one repo-relative path. A file the fix created
+// is added whole, since git diff never lists it.
+export function addedLines({ cwd, logPath, env = process.env, rel }) {
+  requireCwd(cwd, 'addedLines');
+  const root = repoRoot(cwd) ?? cwd;
+  if (untrackedFiles({ cwd }).includes(rel)) return fs.readFileSync(path.join(root, rel), 'utf8').split('\n');
+  const { diff } = thisWork({ cwd, logPath, env });
+  if (!diff) return [];
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    // A renamed file named alone diffs as wholly added, so renaming a template
+    // that already asked something would clear the row. Pair it with its old
+    // path and git reads the rename as the edit it is.
+    const renamed = git([...diff, '-M', '--name-status', '--no-color'])
+      .split('\n').map((l) => l.split('\t')).find((f) => /^R\d*$/.test(f[0]) && f[2] === rel);
+    const paths = renamed ? [renamed[1], rel] : [rel];
+    const out = git([...diff, '-M', '--no-color', '--no-ext-diff', '--', ...paths]);
+    return out.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).map((l) => l.slice(1));
   } catch { return []; }
 }
+
+// A question added to a template shows as a question mark ending a phrase, or
+// an unticked box. "Ending a phrase" is what keeps code out: a ternary has a
+// space before its ?, `?.` and `??` and `x?:` run into more punctuation, and a
+// URL's query runs into a letter. Any ? at all let a 4 row over a code file
+// pass on the first optional chain.
+const QUESTION = /[\p{L}\p{N})"'”’*_`]\?(?=$|[\s"')\]”’*_`])/u;
+const asksSomething = (line) => QUESTION.test(line) || /^\s*[-*]\s+\[ \]/.test(line);
 
 // Nominations are entries too. Keyed by date, a nomination against a day
 // carrying seven entries asked for one row, took a verdict on whichever one the
@@ -462,6 +499,11 @@ function landedRows({ body, fails, cwd, env, logPath, requireReferent }) {
         : touched.size === 0
           ? `"${tail}" exists, but nothing has changed since the log was last committed, so there is no work here for it to be part of`
           : `"${tail}" exists but is not among the files this fix touched or created, so the row points at something this work did not change` });
+    } else if (l.n === 4 && !addedLines({ cwd, logPath, env, rel }).some(asksSomething)) {
+      // 4 is the one number whose claim the diff can show. The rest are the
+      // author's word: a red check is green by the time the entry is written,
+      // and a relocation's origin is usually somewhere the repo cannot see.
+      fails.push({ code: 'deny_landed_question_not_added', detail: `Landed: 4 claims a question added to a template, but nothing this work added to "${tail}" asks one (no "?" and no "- [ ]" line). Claim 3, a written-down rule, or add the question.` });
     }
   }
 }

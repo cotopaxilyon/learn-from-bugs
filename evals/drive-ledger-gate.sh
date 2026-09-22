@@ -77,7 +77,7 @@ Window: `git log -1 --format=%h` → 1 items
 Count: 1
 - 2026-06-11 malformed timestamp: qa
 Bucket: unrecorded
-Landed: 4 the intake template now asks what an unknown id does, src/export.js
+Landed: 3 the unknown-id rule is written beside the export, src/export.js
 Critic: not-run
 '
 

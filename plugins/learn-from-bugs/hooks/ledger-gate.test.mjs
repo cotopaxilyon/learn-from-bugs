@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { decide, validateEntry, nominate, newEntries, vetCommand, observationMatches, touchedFiles, untrackedFiles, ticketPattern, mintShapeFault, gitReachable, gitHasHistory, repoRoot, requireCwd, logNameFrom, runCommand, ALLOWED, themeMemberRows, fieldOf, splitSearchLine } from './ledger-gate.mjs';
+import { decide, validateEntry, nominate, newEntries, vetCommand, observationMatches, touchedFiles, addedLines, untrackedFiles, ticketPattern, mintShapeFault, gitReachable, gitHasHistory, repoRoot, requireCwd, logNameFrom, runCommand, ALLOWED, themeMemberRows, fieldOf, splitSearchLine } from './ledger-gate.mjs';
 
 const LOG = `# Lessons
 
@@ -378,7 +378,7 @@ const THEME = (over = {}) => {
       '- 2026-02-09 activity heading: nobody',
     ].join('\n'),
     Bucket: 'unrecorded',
-    Landed: 'Landed: 4 the intake template now asks the boundary question, src/dates.js',
+    Landed: 'Landed: 3 the boundary rule is written beside the helper, src/dates.js',
     Critic: 'not-run',
     ...over,
   };
@@ -481,7 +481,7 @@ test('a file the fix created counts as a referent, though git diff never lists i
   fs.writeFileSync(path.join(dir, 'src/lookup.js'), 'export function mustFind() {}\n');
   assert.deepEqual(touchedFiles({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md') }), ['src/dates.js']);
   assert.ok(untrackedFiles({ cwd: dir }).includes('src/lookup.js'));
-  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 4 one shared lookup, src/lookup.js' }), []);
+  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 6 one shared lookup, src/lookup.js' }), []);
 });
 
 test('the referent check reads the committed fix, not just the dirty tree', () => {
@@ -500,9 +500,141 @@ test('the referent check reads the committed fix, not just the dirty tree', () =
   git('-c', 'user.email=t@t', '-c', 'user.name=t', 'add', 'src/dates.js');
   git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'the fix');
   assert.deepEqual(touchedFiles({ cwd: dir, logPath }), ['src/dates.js']);
-  const body = THEME({ Landed: 'Landed: 4 the intake template now asks, src/dates.js' });
+  const body = THEME({ Landed: 'Landed: 3 the boundary rule is written beside the helper, src/dates.js' });
   const codes = validateEntry({ date: 'd', title: 't', body }, { onDisk: LOG, nominated: [], cwd: dir, logPath }).map((f) => f.code);
   assert.deepEqual(codes, []);
+});
+
+// ---- mechanism 4 against the diff --------------------------------------
+// 4 claims a question added to a template, and a question leaves a mark the
+// referent's added lines can show. It is the one number the diff can check;
+// every other number is the author's word (land-a-change.md).
+const Q_LOG = path.join('docs/LESSONS.md');
+function templateRepo() {
+  const dir = repo();
+  fs.writeFileSync(path.join(dir, 'docs/template.md'), '# Ticket\n\nWhat we are building and why?\n');
+  execFileSync('git', ['add', 'docs/template.md'], { cwd: dir, stdio: 'ignore' });
+  // Into the scaffold commit, which also holds the log, so the log's last
+  // commit is no older than the template. Committed separately, the template's
+  // creation fell inside lastLogCommit..HEAD and its existing ? answered for a
+  // committed fix that added none; a read of the whole history passed the suite.
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--amend', '--no-edit'], { cwd: dir, stdio: 'ignore' });
+  return dir;
+}
+const commitAll = (dir, msg) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', msg], { cwd: dir, stdio: 'ignore' });
+const q4 = (dir) => themeCodes(dir, { Landed: 'Landed: 4 the template asks it, docs/template.md' });
+
+test('a 4 row whose referent gained no question or checkbox is refused, and the deny names the escape', () => {
+  const dir = templateRepo();
+  fs.appendFileSync(path.join(dir, 'docs/template.md'), '\nComments are not requirements.\n');
+  assert.ok(q4(dir).includes('deny_landed_question_not_added'), JSON.stringify(q4(dir)));
+  const f = validateEntry({ date: 'd', title: 't', body: THEME({ Landed: 'Landed: 4 the template asks it, docs/template.md' }) },
+    { onDisk: LOG, nominated: [], cwd: dir, logPath: path.join(dir, Q_LOG) }).find((x) => x.code === 'deny_landed_question_not_added');
+  assert.match(f.detail, /Claim 3/);
+  assert.ok(!themeCodes(dir, { Landed: 'Landed: 3 the template states it, docs/template.md' }).includes('deny_landed_question_not_added'));
+});
+
+test('a 4 row lands on an added question or an added checkbox', () => {
+  const dir = templateRepo();
+  fs.appendFileSync(path.join(dir, 'docs/template.md'), '\nWhich states does this have?\n');
+  assert.deepEqual(q4(dir), []);
+  const box = templateRepo();
+  fs.appendFileSync(path.join(box, 'docs/template.md'), '\n- [ ] Every comment is in the criteria.\n');
+  assert.deepEqual(q4(box), []);
+});
+
+test('a question mark that was already there, or only removed, does not count', () => {
+  // The template's existing line carries a ?, so a whole-file read would pass
+  // this row; only the added lines are the claim.
+  const dir = templateRepo();
+  const t = path.join(dir, 'docs/template.md');
+  fs.writeFileSync(t, fs.readFileSync(t, 'utf8').replace('What we are building and why?', 'What we are building and why.'));
+  assert.ok(q4(dir).includes('deny_landed_question_not_added'), JSON.stringify(q4(dir)));
+});
+
+test('a 4 row against a committed fix reads the committed diff, not the clean tree', () => {
+  const dir = templateRepo();
+  fs.appendFileSync(path.join(dir, 'docs/template.md'), '\nWhat happens when it is empty?\n');
+  commitAll(dir, 'the fix');
+  assert.deepEqual(q4(dir), []);
+  // And from the refusing side, which is the side a widened read would break.
+  const plain = templateRepo();
+  fs.appendFileSync(path.join(plain, 'docs/template.md'), '\nPlain.\n');
+  commitAll(plain, 'the fix');
+  assert.ok(q4(plain).includes('deny_landed_question_not_added'), JSON.stringify(q4(plain)));
+});
+
+test('renaming a template that already asks something is not adding a question', () => {
+  const staged = templateRepo();
+  execFileSync('git', ['mv', 'docs/template.md', 'docs/renamed.md'], { cwd: staged, stdio: 'ignore' });
+  const r4 = (dir) => themeCodes(dir, { Landed: 'Landed: 4 the template asks it, docs/renamed.md' });
+  assert.ok(r4(staged).includes('deny_landed_question_not_added'), `staged: ${JSON.stringify(r4(staged))}`);
+  commitAll(staged, 'rename');
+  assert.ok(r4(staged).includes('deny_landed_question_not_added'), `committed: ${JSON.stringify(r4(staged))}`);
+  fs.appendFileSync(path.join(staged, 'docs/renamed.md'), '\nWho reviews this?\n');
+  assert.deepEqual(r4(staged), [], 'a question added after the rename still counts');
+});
+
+test('a ? in code or a URL is not a question; a ? ending a phrase is', () => {
+  const at = (line) => {
+    const dir = templateRepo();
+    fs.appendFileSync(path.join(dir, 'docs/template.md'), `\n${line}\n`);
+    return q4(dir).includes('deny_landed_question_not_added');
+  };
+  for (const code of ['const a = b ? c : d;', 'const n = user?.name ?? "x";', 'function f(x?: string) {}', 'See https://x.test/a?b=1 for more.', 'a?b:c']) {
+    assert.ok(at(code), `${code} was read as a question`);
+  }
+  for (const q of ['Which states does this have?', 'What happens when it is empty? List each.', '**Who owns this?**', '- Does it work offline? (yes/no)', '"Is this the default?"']) {
+    assert.ok(!at(q), `${q} was not read as a question`);
+  }
+});
+
+test('a 4 row against a template the fix created reads the whole file', () => {
+  const dir = repo({ touch: ['src/dates.js'] });
+  fs.writeFileSync(path.join(dir, 'docs/new-template.md'), '# Plan\n\nWhat does an empty page show?\n');
+  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 4 a new plan template asks it, docs/new-template.md' }), []);
+  fs.writeFileSync(path.join(dir, 'docs/new-template.md'), '# Plan\n\nState the empty page.\n');
+  assert.ok(themeCodes(dir, { Landed: 'Landed: 4 a new plan template asks it, docs/new-template.md' }).includes('deny_landed_question_not_added'));
+});
+
+test('a 4 row with a ticket-id referent, or on an issue entry, is not read against a diff', () => {
+  const dir = repo({ touch: ['src/dates.js'] });
+  assert.ok(!themeCodes(dir, { Landed: 'Landed: 4 the template asks it, PROJ-412' }).includes('deny_landed_question_not_added'));
+  const issue = GOOD.replace('Landed: 3 test/dates.test.js header names the convention', 'Landed: 4 the intake template asks the boundary question');
+  assert.ok(!v(repo({ touch: ['src/dates.js'] }), issue).includes('deny_landed_question_not_added'));
+});
+
+// Run 12's two candidate arms, replayed from the patches they left
+// (evals/fixtures/backlog-read-dates/run12/). Both wrote a number one notch
+// above what their diff built.
+function replayRun12(arm) {
+  const fixture = path.join(import.meta.dirname, '../../../evals/fixtures/backlog-read-dates');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lfb-run12-'));
+  fs.cpSync(path.join(fixture, 'docs'), path.join(dir, 'docs'), { recursive: true });
+  fs.copyFileSync(path.join(fixture, 'tickets.jsonl'), path.join(dir, 'tickets.jsonl'));
+  const git = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q');
+  git('add', '.');
+  git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'export');
+  git('apply', path.join(fixture, 'run12', `${arm}.patch`));
+  const logPath = path.join(dir, 'docs/LESSONS.md');
+  const content = fs.readFileSync(logPath, 'utf8');
+  git('checkout', '--', 'docs/LESSONS.md');
+  return { dir, content, entry: (swap) => codes(decide(write(dir, swap ? content.replace(...swap) : content))) };
+}
+
+test('run 12 cand-1: its Landed: 4 over declarative prose is refused, and lands as the 3 it built', () => {
+  const r = replayRun12('cand-1');
+  assert.deepEqual(r.entry(), ['deny_landed_question_not_added']);
+  assert.deepEqual(r.entry(['Landed: 4 template states', 'Landed: 3 template states']), []);
+});
+
+test('run 12 cand-2: its honest 4 lands, and its mis-numbered 6 is a known miss, not a refusal', () => {
+  // The template gained a `- [ ]` line, so the 4 row is what it built. The 6
+  // row relocated nothing, but 6 is the author's word: its origin is usually a
+  // comment or a conversation the repo cannot see, so the gate does not rule.
+  const r = replayRun12('cand-2');
+  assert.deepEqual(r.entry(), []);
 });
 
 test('without the log path the referent check falls back to HEAD, it does not go blind', () => {
@@ -574,12 +706,12 @@ test('an untracked file is a referent only beside a real change', () => {
   assert.ok(codes.includes('deny_landed_referent_untouched'), codes.join(','));
   // beside a real change the created file counts, which is the case this exists for
   fs.appendFileSync(path.join(dir, 'src/dates.js'), '// the fix\n');
-  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 4 one shared lookup, the-rule.md' }), []);
+  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 6 one shared lookup, the-rule.md' }), []);
 });
 
 test('a referent path is compared after normalisation, not as typed', () => {
   const dir = repo({ touch: ['src/dates.js'] });
-  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 4 the fix, ./src/dates.js' }), []);
+  assert.deepEqual(themeCodes(dir, { Landed: 'Landed: 3 the fix, ./src/dates.js' }), []);
 });
 
 test('where git does not answer, the gate says so instead of ruling', () => {
@@ -907,6 +1039,7 @@ test('every repo-reading export refuses a cwd it cannot use, and the list is der
   const NULLABLE = 'nullable';
   const contract = {
     touchedFiles: [REQUIRES, (cwd) => touchedFiles({ cwd, logPath: '/tmp/x/docs/LESSONS.md' })],
+    addedLines: [REQUIRES, (cwd) => addedLines({ cwd, logPath: '/tmp/x/docs/LESSONS.md', rel: 'docs/t.md' })],
     untrackedFiles: [REQUIRES, (cwd) => untrackedFiles({ cwd })],
     nominate: [REQUIRES, (cwd) => nominate({ cwd, logPath: '/tmp/x/docs/LESSONS.md', headings: [] })],
     gitReachable: [REQUIRES, (cwd) => gitReachable(cwd)],
@@ -1017,7 +1150,7 @@ test('an untracked referent on an otherwise clean tree is told how to become one
   fs.writeFileSync(path.join(dir, 'src/lookup.js'), 'export function mustFind() {}\n');
   assert.deepEqual(touchedFiles({ cwd: dir, logPath: path.join(dir, 'docs/LESSONS.md') }), []);
   const fails = validateEntry(
-    { date: 'd', title: 't', body: THEME({ Landed: 'Landed: 4 one shared lookup, src/lookup.js' }) },
+    { date: 'd', title: 't', body: THEME({ Landed: 'Landed: 6 one shared lookup, src/lookup.js' }) },
     { onDisk: LOG, nominated: [], cwd: dir, logPath: logIn(dir) },
   );
   const f = fails.find((x) => x.code === 'deny_landed_referent_untouched');
@@ -1257,7 +1390,7 @@ Window: \`grep -n '^## ' docs/LESSONS.md\` → 3 items
 Count: 1
 - 2026-06-11 malformed timestamp: qa
 Bucket: unrecorded
-Landed: 4 the template asks the question, ${referent}
+Landed: 3 the rule is written down, ${referent}
 Critic: not-run
 `;
   const at = (cwd, referent) => codes(decide({

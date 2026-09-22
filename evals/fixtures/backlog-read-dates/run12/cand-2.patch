@@ -1,0 +1,82 @@
+diff --git a/docs/LESSONS.md b/docs/LESSONS.md
+index 2b11d1b..74af8bd 100644
+--- a/docs/LESSONS.md
++++ b/docs/LESSONS.md
+@@ -1,3 +1,53 @@
+ # Incident log
+ 
+ Newest first. Started 2026-08-10; nothing before that date was written up.
++
++## 2026-09-22 — Half our closed tickets shipped wrong because the requirement sat in a comment posted before work started
++
++> *What happened:* periodic read of the closed-ticket export (12 tickets,
++> 2026-03-02 to 2026-08-01; 9 reopened). In six of them (six of the nine
++> reopens), product or design posted the requirement as a comment one to two
++> days after the ticket was created and
++> before it moved to In Progress: INV-101 (large-account sort), INV-104 (status
++> text for screen readers), INV-107 (first-invoice empty state), INV-110
++> (locale dates), INV-113 (Viewer must not see bank details), INV-116 (phone
++> filter layout). Each time, dev built exactly the acceptance criteria, and the
++> fix was exactly the comment. The six have six different symptoms (sort,
++> a11y, empty state, locale, permissions, mobile). Four carry no shared
++> label, and the `ux` label on 101 and 107 does not group them either.
++> *Why nothing caught it:* the acceptance criteria were the only thing any gate
++> checked. Dev built to them ("alphabetical sort per AC", "four badge colours
++> per AC"). QA caught four (101, 107, 113, 116). On the other two, QA recorded
++> "Matches AC" and "Passes AC", and users found the problem (104, 110). The
++> export can't show whether QA read the comments on the four it caught. The
++> requirement existed, it
++> was correct, and it was posted on time. It was in the place nobody builds
++> from.
++> *The rule:* the description is the requirement. A requirement-bearing
++> comment is copied into the acceptance criteria before the ticket goes to In
++> Progress. A later one is an edit to the criteria, and a comment announces it.
++> Asking people to read comments more carefully is not the fix, because that is
++> exactly what failed six times.
++> *Also in the window, not picked:* two tickets where one word meant two things
++> (INV-102 "hidden", INV-114 "active"). Both were found by users, and a readback
++> would fix them. Symptom labels are empty on 5 of 12 tickets. The export skips
++> INV-103/106/109/112/115, so check whether it is filtered. The retrieval only
++> sees product and design comments in the tracker. Requirements that lived in
++> design frames, chat, or support comments are not counted, so six is a floor.
++> Members were selected by role and date and then read by hand.
++
++```
++Theme: new — requirement lives in a comment; no prior label exists, the log was empty
++Window: `grep -o "\"id\":\"INV-[0-9]*\"" tickets.jsonl` → 12 items
++Count: 6
++- INV-101: qa
++- INV-104: user
++- INV-107: qa
++- INV-110: user
++- INV-113: qa
++- INV-116: qa
++Bucket: unread
++Landed: 6 requirement-bearing comments are promoted into the acceptance criteria before In Progress, and later changes edit the criteria, docs/ticket-template.md
++Landed: 4 a Ready-for-In-Progress checkbox, ticked by whoever starts the work, docs/ticket-template.md
++Critic: ran
++```
+diff --git a/docs/ticket-template.md b/docs/ticket-template.md
+index c72d36a..dfb1b53 100644
+--- a/docs/ticket-template.md
++++ b/docs/ticket-template.md
+@@ -8,6 +8,19 @@ What we are building and why.
+ 
+ - Given ..., when ..., then ...
+ 
++The description is the requirement; comments are not. Anything product or
++design adds in a comment ("should", "must", "instead", a frame to follow) is
++copied into these criteria before the ticket moves to In Progress. After that,
++a new requirement is an edit to this section plus a comment saying it changed,
++never a comment alone. Dev builds against this section and QA verifies against
++it, so a requirement that is only in a comment will not be built or tested.
++
++## Ready for In Progress
++
++- [ ] Every product or design comment that states a requirement has been
++      copied into the acceptance criteria above. Whoever moves the ticket to In
++      Progress ticks this.
++
+ ## Design
+ 
+ Link to the frame, if there is one.
